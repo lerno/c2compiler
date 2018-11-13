@@ -4,41 +4,34 @@
 
 // @file{file1}
 module test;
+import stdio local;
 
 public func i32 main(i32 argc, const i8*[] argv) {
-    i32 a = 0;
+	i32 a = 0;
     while (a) {
-        if (argc == 1) continue;
-        if (argc == 2) break;
+	    defer printf("2");
+        if (argc == 1) break;
+        printf("3");
     }
-
-    while (i32 b = 10) {}
-
-    while (true) {}
-
     return 0;
 }
 
 // @expect{atleast, build/test.c}
 
+
 int32_t main(int32_t argc, const char* argv[]) {
     int32_t a = 0;
     while (a) {
         if ((argc == 1)) {
-				    continue;
-				}
-        if ((argc == 2)) {
-						break;
-				}
+            do {
+                printf("2");
+            } while(0);
+            break;
+        }
+        printf("3");
+        do {
+            printf("2");
+        } while(0);
     }
-
-    int32_t b = 10;
-    while (b) {
-    }
-
-    while (1) {
-    }
-
     return 0;
 }
-

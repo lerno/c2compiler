@@ -32,6 +32,7 @@ class VarDecl;
 class ASTContext;
 class IdentifierExpr;
 class StringLiteral;
+class DeferStmt;
 
 enum StmtKind {
     STMT_RETURN = 0,
@@ -50,6 +51,7 @@ enum StmtKind {
     STMT_COMPOUND,
     STMT_DECL,
     STMT_ASM,
+    STMT_DEFER,
 };
 
 
@@ -94,6 +96,34 @@ protected:
         unsigned : NumStmtBits;
 
         unsigned numCases : 32 - NumStmtBits;
+    };
+
+
+    class BreakStmtBitfields {
+        friend class BreakStmt;
+        unsigned : NumStmtBits;
+        unsigned inDefer : 16;
+    };
+
+    class LabelStmtBitfields {
+        friend class LabelStmt;
+        unsigned : NumStmtBits;
+        unsigned inDefer : 16;
+    };
+
+
+
+    class DeferStmtBitfields {
+        friend class DeferStmt;
+        unsigned : NumStmtBits;
+        unsigned deferId : 16;
+        unsigned emitBoolean : 1;
+    };
+
+    class GotoStmtBitfields {
+        friend class GotoStmt;
+        unsigned : NumStmtBits;
+        unsigned inDefer : 16;
     };
 
     class CaseStmtBitfields {
@@ -216,14 +246,12 @@ protected:
     class DesignatedInitExprBitfields {
         friend class DesignatedInitExpr;
         unsigned : NumExprBits;
-
         unsigned DesignatorKind : 1;
     };
 
     class BitOffsetExprBitfields {
         friend class BitOffsetExpr;
         unsigned : NumExprBits;
-
         unsigned width : 8;
     };
 
@@ -234,6 +262,10 @@ protected:
         DefaultStmtBitfields defaultStmtBits;
         CompoundStmtBitfields compoundStmtBits;
         AsmStmtBitFields asmStmtBits;
+        GotoStmtBitfields gotoStmtBits;
+        BreakStmtBitfields breakStmtBits;
+        DeferStmtBitfields deferStmtBits;
+        LabelStmtBitfields labelStmtBits;
 
         ExprBitfields exprBits;
         IdentifierExprBitfields identifierExprBits;
@@ -271,6 +303,8 @@ public:
 private:
     SourceLocation RetLoc;
     Expr* value;
+public:
+    DeferStmt **deferStmts;
 };
 
 
@@ -431,11 +465,15 @@ public:
     static bool classof(const Stmt* S) {
         return S->getKind() == STMT_BREAK;
     }
+    unsigned inDefer() const { return breakStmtBits.inDefer; }
+    void setInDefer(unsigned deferId) { breakStmtBits.inDefer = deferId; }
 
     void print(StringBuilder& buffer, unsigned indent) const;
     SourceLocation getLocation() const { return Loc; }
 private:
     SourceLocation Loc;
+public:
+    DeferStmt** deferStmts;
 };
 
 
@@ -450,6 +488,8 @@ public:
     SourceLocation getLocation() const { return Loc; }
 private:
     SourceLocation Loc;
+public:
+    DeferStmt** deferStmts;
 };
 
 
@@ -462,12 +502,19 @@ public:
 
     void print(StringBuilder& buffer, unsigned indent) const;
     SourceLocation getLocation() const { return Loc; }
+
+
+    unsigned inDefer() const { return labelStmtBits.inDefer; }
+    void setInDefer(unsigned deferId) { labelStmtBits.inDefer = deferId; }
+
     Stmt* getSubStmt() const { return subStmt; }
     const char* getName() const { return name; }
 private:
     SourceLocation Loc;
     const char* name;
     Stmt* subStmt;
+public:
+    const DeferStmt* deferStmtTop;
 };
 
 
@@ -478,12 +525,16 @@ public:
         return S->getKind() == STMT_GOTO;
     }
 
+    unsigned inDefer() const { return gotoStmtBits.inDefer; }
+    void setInDefer(unsigned deferId) { gotoStmtBits.inDefer = deferId; }
     void print(StringBuilder& buffer, unsigned indent) const;
     SourceLocation getLocation() const { return GotoLoc; }
     IdentifierExpr* getLabel() const { return label; }
 private:
     IdentifierExpr* label;
     SourceLocation GotoLoc;
+public:
+    DeferStmt** deferStmts;
 };
 
 
@@ -524,6 +575,30 @@ private:
     VarDecl* decl;
 };
 
+
+class DeferStmt : public Stmt {
+public:
+    DeferStmt(SourceLocation Loc_, Stmt* Defer_, CompoundStmt *CompoundStmt);
+    static bool classof(const Stmt* S) {
+        return S->getKind() == STMT_DEFER;
+    }
+
+    void print(StringBuilder& buffer, unsigned indent) const;
+    SourceLocation getLocation() const { return Loc; }
+
+    unsigned deferId() const { return deferStmtBits.deferId; }
+    void setDeferId(unsigned id) { deferStmtBits.deferId = id; }
+
+    void setEmitBoolean(bool emit) { deferStmtBits.emitBoolean = emit; };
+    bool shouldEmitBoolean() const { return deferStmtBits.emitBoolean; }
+
+    Stmt* getDefer() const { return Defer; }
+    CompoundStmt* getAfterDefer() const { return AfterDefer; }
+private:
+    SourceLocation Loc;
+    Stmt* Defer;
+    CompoundStmt* AfterDefer;
+};
 
 class AsmStmt : public Stmt {
 public:

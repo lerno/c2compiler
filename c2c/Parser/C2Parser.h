@@ -68,6 +68,7 @@ public:
 private:
     c2lang::Preprocessor& PP;
     Token Tok;
+    Token PushedBackToken;
     SourceLocation PrevTokLocation;
     unsigned short ParenCount, BracketCount, BraceCount;
     C2Sema& Actions;
@@ -123,6 +124,7 @@ private:
   /// A SmallVector of expressions, with stack size 12 (the maximum used.)
   typedef SmallVector<Expr*, 12> ExprVector;
 
+    StmtResult ParseDeferStatement();
     StmtResult ParseCompoundStatement();
     StmtResult ParseStatement();
     StmtResult ParseAsmStatement();
@@ -215,8 +217,18 @@ private:
         std::cerr << ANSI_NORMAL << std::endl;
         }
 #endif
-        PP.Lex(Tok);
+        if (PushedBackToken.getKind() != tok::TokenKind::unknown) {
+            Tok = PushedBackToken;
+            PushedBackToken.setKind(tok::TokenKind::unknown);
+        } else {
+            PP.Lex(Tok);
+        }
         return PrevTokLocation;
+    }
+
+    void PushToken(tok::TokenKind token) {
+        PushedBackToken = Tok;
+        Tok.setKind(token);
     }
 
     bool TryConsumeToken(tok::TokenKind Expected) {

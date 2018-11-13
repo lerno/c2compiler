@@ -157,6 +157,13 @@ protected:
         unsigned IsLocal : 1;
     };
 
+    class LabelDeclBits {
+        friend class LabelDecl;
+        unsigned : NumDeclBits;
+
+        unsigned inDefer : 16;
+    };
+
     union {
         DeclBitfields declBits;
         VarDeclBits varDeclBits;
@@ -164,6 +171,7 @@ protected:
         EnumTypeDeclBits enumTypeDeclBits;
         FunctionDeclBits functionDeclBits;
         ImportDeclBits importDeclBits;
+        LabelDeclBits labelDeclBits;
     };
     SourceLocation loc;
     QualType type;
@@ -236,6 +244,8 @@ public:
         args = args_;
         functionDeclBits.numArgs = numArgs_;
     }
+    void setConditionalDefers(unsigned* defers_) { conditionalDefers = defers_; }
+    unsigned* getConditionalDefers() const { return conditionalDefers; }
     VarDecl* getArg(unsigned i) const { return args[i]; }
     unsigned numArgs() const { return functionDeclBits.numArgs; }
     unsigned minArgs() const;
@@ -268,6 +278,7 @@ private:
     VarDecl** args;
     CompoundStmt* body;
     mutable llvm::Function* IRProto;
+    unsigned* conditionalDefers;
 };
 
 
@@ -454,6 +465,9 @@ public:
         return D->getKind() == DECL_LABEL;
     }
     void print(StringBuilder& buffer, unsigned indent) const;
+
+    unsigned inDefer() const { return labelDeclBits.inDefer; }
+    void setInDefer(unsigned deferId) { labelDeclBits.inDefer = deferId; }
 
     LabelStmt* getStmt() const { return TheStmt; }
     void setStmt(LabelStmt* S) { TheStmt = S; }

@@ -37,9 +37,13 @@ class VarDecl;
 class FunctionDecl;
 class EnumConstantDecl;
 class LabelDecl;
+class BreakStmt;
+class ContinueStmt;
 class DesignatedInitExpr;
 class Stmt;
+class LabelStmt;
 class SwitchStmt;
+class DeferStmt;
 class Expr;
 class IdentifierExpr;
 class InitListExpr;
@@ -47,7 +51,8 @@ class MemberExpr;
 class CallExpr;
 class BuiltinExpr;
 class ASTContext;
-
+class GotoStmt;
+class ReturnStmt;
 
 constexpr size_t MAX_STRUCT_INDIRECTION_DEPTH = 256;
 
@@ -82,6 +87,7 @@ private:
     void analyseReturnStmt(Stmt* stmt);
     void analyseDeclStmt(Stmt* stmt);
     void analyseAsmStmt(Stmt* stmt);
+    void analyseDeferStmt(Stmt* stmt);
     bool analyseCondition(Stmt* stmt);
     void analyseStmtExpr(Stmt* stmt);
 
@@ -123,6 +129,7 @@ private:
     QualType analyseEnumMinMaxExpr(BuiltinExpr* B, bool isMin);
     void analyseArrayType(VarDecl* V, QualType T);
     void analyseArraySizeExpr(ArrayType* AT);
+    DeferStmt** deferVectorToArray();
 
     c2lang::DiagnosticBuilder Diag(c2lang::SourceLocation Loc, unsigned DiagID) const;
     void pushMode(unsigned DiagID);
@@ -173,6 +180,8 @@ private:
     bool usedPublicly;
     bool isInterface;
 
+    unsigned deferId;
+
     // Our callstack (statically allocated)
     struct CallStack {
         Expr *structFunction[MAX_STRUCT_INDIRECTION_DEPTH];
@@ -183,14 +192,84 @@ private:
         void setStructFunction(Expr* expr) { structFunction[callDepth - 1] = expr; }
     };
 
+
+    std::vector<unsigned> conditionalDefers {};
+
     CallStack callStack;
+
+    enum class DeferWalkEntry {
+        DEFER,
+        GOTO,
+        LABEL,
+        BREAK,
+        CONTINUE,
+        RETURN,
+        BREAK_START,
+        BREAK_CONTINUE_START,
+        BREAK_END,
+        BREAK_CONTINUE_END,
+        EXIT_DEFER,
+    };
+    struct DeferWalk {
+        DeferWalkEntry type;
+        unsigned depth;
+        union {
+            ReturnStmt* returnStmt;
+            ContinueStmt* continueStmt;
+            BreakStmt* breakStmt;
+            DeferStmt* deferStmt;
+            GotoStmt* gotoStmt;
+            LabelDecl* labelDecl;
+            Stmt* entryPoointStmt;
+        } as;
+    };
+
+    std::vector<DeferWalk> deferWalk {};
+    unsigned deferDepth = 0;
+
+    void addAllPreviousDefers(unsigned startIndex, unsigned endIndex);
+
+    void pushDeferEntry(DeferWalk &&walk) {
+        walk.depth = deferDepth;
+        switch(walk.type) {
+            case DeferWalkEntry::DEFER:
+                ++deferDepth;
+                break;
+            case DeferWalkEntry::EXIT_DEFER:
+                --deferDepth;
+                break;
+            case DeferWalkEntry::CONTINUE:
+            case DeferWalkEntry::BREAK:
+            case DeferWalkEntry::LABEL:
+            case DeferWalkEntry::GOTO:
+            case DeferWalkEntry::BREAK_CONTINUE_START:
+            case DeferWalkEntry::BREAK_START:
+            case DeferWalkEntry::BREAK_CONTINUE_END:
+            case DeferWalkEntry::BREAK_END:
+            case DeferWalkEntry::RETURN:
+                break;
+        }
+        deferWalk.push_back(std::move(walk));
+    }
+
 
     typedef std::vector<LabelDecl*> Labels;
     typedef Labels::iterator LabelsIter;
-    Labels labels;
+    Labels labels {};
+    typedef std::vector<GotoStmt*> Gotos;
+    Gotos gotos {};
+    std::vector<DeferStmt *> defersFound {};
 
     FunctionAnalyser(const FunctionAnalyser&);
     FunctionAnalyser& operator= (const FunctionAnalyser&);
+    void analyseDeferWalk();
+    void analyseDeferGotoForward(unsigned gotoIndex, unsigned labelIndex);
+    void analyseDeferGotoBack(unsigned gotoIndex, unsigned labelIndex);
+    void analyseDeferGoto(unsigned i);
+    void analyseDeferBreak(unsigned i);
+    void analyseDeferContinue(unsigned i);
+    void analyseDeferReturn(unsigned i);
+    void reportGotoDeferError(GotoStmt* gotoStmt, LabelDecl* labelDecl);
 };
 
 }

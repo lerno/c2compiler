@@ -34,6 +34,7 @@ namespace C2 {
 class Decl;
 class VarDecl;
 class ImportDecl;
+class DeferStmt;
 
 struct DynamicScope {
     DynamicScope(c2lang::DiagnosticsEngine& Diags_);
@@ -82,6 +83,9 @@ public:
         /// the FnScope and DeclScope flags set as well.
         BlockScope = 0x40,
 
+        // Prevent break, continue, return
+        DeferScope = 0x80,
+
         /// SwitchScope - This is a scope that corresponds to a switch statement.
         SwitchScope = 0x800,
 
@@ -95,7 +99,6 @@ public:
     void addImportDecl(ImportDecl* importDecl);
     bool checkScopedSymbol(const VarDecl* V) const;
     void addScopedSymbol(VarDecl* V);
-
     // searching
     const Module* findUsedModule(const std::string& name, c2lang::SourceLocation loc, bool usedPublic) const;
     Decl* findSymbol(const std::string& name, c2lang::SourceLocation loc, bool isType, bool usedPublic) const;
@@ -111,6 +114,8 @@ public:
     bool inline allowBreak()    const { return curScope->Flags & BreakScope; }
     bool inline allowContinue() const { return curScope->Flags & ContinueScope; }
     bool inline hasDecls() const { return curScope->Flags & HasDecls; }
+    bool inline allowScopeExit() const { return (curScope->Flags & DeferScope) == 0; }
+    bool inline isDeferScope() const { return (curScope->Flags & DeferScope) != 0; }
 
     bool isExternal(const Module* mod) const {
         return (mod && mod != myModule);

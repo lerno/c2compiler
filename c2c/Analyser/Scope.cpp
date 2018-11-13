@@ -302,12 +302,15 @@ void Scope::EnterScope(unsigned flags) {
     DynamicScope* parent = curScope;
     curScope = scopes[scopeIndex];
     curScope->reset(flags);
-
     if (parent) {
         if (parent->Flags & BreakScope) curScope->Flags |= BreakScope;
         if (parent->Flags & ContinueScope) curScope->Flags |= ContinueScope;
+        if (parent->Flags & DeferScope) curScope->Flags |= DeferScope;
     }
-
+    if (flags & DeferScope) {
+        // Continue is not valid when entering Defer.
+        curScope->Flags &= ~ContinueScope;
+    }
     scopeIndex++;
 }
 
@@ -337,4 +340,5 @@ const Module* Scope::findAnyModule(const char* name_) const {
     if (iter == allModules.end()) return 0;
     return iter->second;
 }
+
 

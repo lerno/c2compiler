@@ -25,6 +25,7 @@
 namespace C2 {
 
 class Decl;
+class DeferStmt;
 class VarDecl;
 class TypeDecl;
 class FunctionDecl;
@@ -39,6 +40,8 @@ class CompoundStmt;
 class AsmStmt;
 class HeaderNamer;
 class TargetInfo;
+class BreakStmt;
+
 
 // generates LLVM Module from (multiple) Module(s)
 class CCodeGenerator : public CTypeWriter {
@@ -77,7 +80,7 @@ private:
     void EmitVarDecl(const VarDecl* D, StringBuilder& output, unsigned indent);
 
     void EmitStmt(const Stmt* S, unsigned indent);
-    void EmitCompoundStmt(const CompoundStmt* C, unsigned indent, bool startOnNewLine);
+    void EmitCompoundStmt(const CompoundStmt* C, unsigned indent, bool skipBraces);
     void EmitIfStmt(const Stmt* S, unsigned indent);
     void EmitWhileStmt(const Stmt* S, unsigned indent);
     void EmitDoStmt(const Stmt* S, unsigned indent);
@@ -108,6 +111,7 @@ private:
     void EmitConditionPost(const Stmt* S);
     bool EmitAttributes(const Decl* D, StringBuilder& output, bool addStartSpace);
 
+    void EmitDefers(DeferStmt** deferList, unsigned indent);
     bool EmitAsStatic(const Decl* D) const;
     bool EmitAsDefine(const VarDecl* V) const;
 
@@ -127,6 +131,8 @@ private:
 
     CCodeGenerator(const CCodeGenerator&);
     CCodeGenerator& operator= (const CCodeGenerator&);
+    void EmitDeferStmt(const DeferStmt* defer, unsigned indent);
+    void EmitBreakStmt(const BreakStmt* breakStmt, unsigned indent);
 };
 
 }

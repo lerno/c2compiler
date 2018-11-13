@@ -195,7 +195,7 @@ public:
   /// SetKeepWhitespaceMode - This method lets clients enable or disable
   /// whitespace retention mode.
   void SetKeepWhitespaceMode(bool Val) {
-    assert((!Val || LexingRawMode || LangOpts.TraditionalCPP) &&
+    assert((!Val || LexingRawMode) &&
            "Can only retain whitespace in raw mode or -traditional-cpp");
     ExtendedTokenMode = Val ? 2 : 0;
   }
