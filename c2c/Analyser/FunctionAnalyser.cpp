@@ -356,6 +356,9 @@ void FunctionAnalyser::analyseDoStmt(Stmt* stmt) {
 
 void FunctionAnalyser::analyseDeferStmt(Stmt* stmt) {
     LOG_FUNC
+    if (!scope.allowDefer()) {
+        TODO; // Diagnostics here, rejecting it.
+    }
     std::vector<LabelDecl *> preDeferLabels(32); // Possibly make this a clean array and set a max.
     for (LabelDecl* labelDecl : labels)
     {

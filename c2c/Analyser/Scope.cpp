@@ -302,7 +302,10 @@ void Scope::EnterScope(unsigned flags, const DeferStmt* deferTop) {
         if (parent->Flags & ContinueScope) curScope->Flags |= ContinueScope;
         if (parent->Flags & DeferScope) curScope->Flags |= DeferScope;
     }
-
+    if (flags & DeferScope) {
+        // Continue is not valid when entering Defer.
+        curScope->Flags &= ~ContinueScope;
+    }
     scopeIndex++;
 }
 
