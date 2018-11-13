@@ -40,6 +40,7 @@ class CompoundStmt;
 class AsmStmt;
 class HeaderNamer;
 class TargetInfo;
+class BreakStmt;
 
 const size_t MAX_DEFERS = 256;
 
@@ -140,7 +141,8 @@ private:
     DeferStack deferStack {};
     CCodeGenerator(const CCodeGenerator&);
     CCodeGenerator& operator= (const CCodeGenerator&);
-    void EmitDeferStmt(const DeferStmt* defer, unsigned int indent);
+    void EmitDeferStmt(const DeferStmt* defer, unsigned indent);
+    void EmitBreakStmt(const BreakStmt* breakStmt, unsigned indent);
 };
 
 }

@@ -116,7 +116,7 @@ public:
     bool allowBreak()    const { return curScope->Flags & BreakScope; }
     bool allowContinue() const { return curScope->Flags & ContinueScope; }
     bool allowScopeExit() const { return (curScope->Flags & DeferScope) == 0; }
-    bool isDeferScope() const { return (curScope->Flags & DeferScope) == 0; }
+    bool isDeferScope() const { return (curScope->Flags & DeferScope) != 0; }
     bool isExternal(const Module* mod) const {
         return (mod && mod != myModule);
     }

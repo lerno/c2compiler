@@ -7,8 +7,15 @@ module test;
 import stdio local;
 
 public func i32 main(i32 argc, const i8*[] argv) {
-    defer printf("1");
 	i32 a = 0;
+    {
+        defer { 
+            if (a == 1) break;
+            printf("Defer");
+        }
+        printf("A");
+    }
+    defer printf("1");
     while (a) {
 	    defer printf("2");
         if (argc == 1) break;
@@ -32,63 +39,75 @@ public func i32 main(i32 argc, const i8*[] argv) {
 #include "stdio.h"
 
 int32_t main(int32_t argc, const char* argv[]) {
+    int32_t a = 0;
     {
-        int32_t a = 0;
+        {
+            printf("A");
+        }
+        do {
+            if ((a == 1)) {
+                break;
+            }
+            printf("Defer");
+        }
+        while(0);
+    }
+    {
         while (a) {
             {
                 if ((argc == 1)) {
-                    {
+                    do {
                         printf("2");
-                    }
+                    } while(0);
 			        break;
                 }
                 {
 		            printf("4");
                 }
-		        {
+		        do {
                     printf("3");
-                }
+                } while(0);
             }
-            {
+            do {
                 printf("2");
-            }
+            } while(0);
         }
         {
             while (a) {
                 {
                     if ((argc == 1)) {
-                        {
+                        do {
                             printf("6");
-                        }
+                        } while(0);
                         break;
                     }
                     {
                         printf("8");
-                        {
+                        do {
                             printf("7");
-                        }
-                        {
+                        } while(0);
+                        do {
                             printf("6");
-                        }
+                        } while(0);
                         break;
-                        {
+                        do {
                             printf("9");
-                        }
+                        } while(0);
                     }
-                    {
+                    do {
                         printf("7");
-                    }
+                    } while(0);
                 }
-                {
+                do {
                     printf("6");
-                }
+                } while(0);
             }
-            {
+            do {
                 printf("5");
-            }
-            {
+            } while(0);
+            do {
                 printf("1");
-            }
+            } while(0);
             return 0;
         }
     }

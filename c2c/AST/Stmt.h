@@ -100,10 +100,18 @@ protected:
 
 
     class BreakStmtBitfields {
+        friend class BreakStmt;
+        unsigned : NumStmtBits;
+        unsigned inDefer : 16;
+    };
+
+    class LabelStmtBitfields {
         friend class LabelStmt;
         unsigned : NumStmtBits;
         unsigned inDefer : 16;
     };
+
+
 
     class DeferStmtBitfields {
         friend class DeferStmt;
@@ -255,6 +263,7 @@ protected:
         GotoStmtBitfields gotoStmtBits;
         BreakStmtBitfields breakStmtBits;
         DeferStmtBitfields deferStmtBits;
+        LabelStmtBitfields labelStmtBits;
 
         ExprBitfields exprBits;
         IdentifierExprBitfields identifierExprBits;
@@ -446,6 +455,8 @@ public:
     static bool classof(const Stmt* S) {
         return S->getKind() == STMT_BREAK;
     }
+    unsigned inDefer() const { return breakStmtBits.inDefer; }
+    void setInDefer(unsigned deferId) { breakStmtBits.inDefer = deferId; }
 
     void print(StringBuilder& buffer, unsigned indent) const;
     SourceLocation getLocation() const { return Loc; }
@@ -453,7 +464,6 @@ private:
     SourceLocation Loc;
 public:
     const DeferStmt* deferStmtAtScopeStart;
-    const DeferStmt* inDefer;
 };
 
 
@@ -483,6 +493,9 @@ public:
     void print(StringBuilder& buffer, unsigned indent) const;
     SourceLocation getLocation() const { return Loc; }
 
+
+    unsigned inDefer() const { return labelStmtBits.inDefer; }
+    void setInDefer(unsigned deferId) { labelStmtBits.inDefer = deferId; }
 
     Stmt* getSubStmt() const { return subStmt; }
     const char* getName() const { return name; }

@@ -24,16 +24,16 @@ int32_t main(int32_t argc, const char* argv[]) {
     while (a) {
         {
             if ((argc == 1)) {
-                {
+                do {
                     printf("2");
-                }
+                } while(0);
                 break;
             }
             printf("3");
         }
-        {
+        do {
             printf("2");
-        }
+        } while(0);
     }
     return 0;
 }

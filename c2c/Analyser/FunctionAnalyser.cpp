@@ -140,6 +140,7 @@ void FunctionAnalyser::check(FunctionDecl* func) {
         if (!LD->isUsed()) {
             Diag(LD->getLocation(), diag::warn_unused_label) << LD->DiagName();
         }
+        LD->getStmt()->setInDefer(LD->inDefer());
     }
     labels.clear();
     CurrentFunction = 0;
@@ -369,7 +370,7 @@ void FunctionAnalyser::analyseDeferStmt(Stmt* stmt) {
     }
     DeferStmt* D = cast<DeferStmt>(stmt);
     D->setDeferId(++deferId);
-    scope.EnterScope(Scope::DeferScope, nullptr);
+    scope.EnterScope(Scope::DeferScope | Scope::BreakScope, nullptr);
     analyseStmt(D->getDefer());
     scope.ExitScope();
     deferStack.push(D);
@@ -475,7 +476,7 @@ void FunctionAnalyser::analyseLabelStmt(Stmt* S) {
     unsigned deferIdExpected = scope.isDeferScope() ? deferId : 0;
 
     // If we already reached this label, check with the previously set value
-    if (!LD->isUsed()) {
+    if (LD->isUsed()) {
         if (LD->inDefer() != deferIdExpected) {
             TODO; // Tried to jump to this label from defer but it's in the wrong one -> check which goto we should flag for error.
             // Three cases: goto from defer out of defer, goto from one defer to another defer, goto into defer.

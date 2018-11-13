@@ -37,58 +37,58 @@ int32_t main(int32_t argc, const char* argv[]) {
         while (a) {
             {
                 if ((argc == 1)) {
-                    {
+                    do {
                         printf("2");
-                    }
+                    } while(0);
                     continue;
                 }
                 {
 		            printf("4");
                 }
-		        {
+		        do {
                     printf("3");
-                }
+                } while(0);
             }
-            {
+            do {
                 printf("2");
-            }
+            } while(0);
         }
         {
             while (a) {
                 {
                     if ((argc == 1)) {
-                        {
+                        do {
                             printf("6");
-                        }
+                        } while(0);
                         continue;
                     }
                     {
                         printf("8");
-                        {
+                        do {
                             printf("7");
-                        }
-                        {
+                        } while(0);
+                        do {
                             printf("6");
-                        }
+                        } while(0);
                         continue;
-                        {
+                        do {
                             printf("9");
-                        }
+                        } while(0);
                     }
-                    {
+                    do {
                         printf("7");
-                    }
+                    } while(0);
                 }
-                {
+                do {
                     printf("6");
-                }
+                } while(0);
             }
-            {
+            do {
                 printf("5");
-            }
-            {
+            } while(0);
+            do {
                 printf("1");
-            }
+            } while(0);
             return 0;
         }
     }
