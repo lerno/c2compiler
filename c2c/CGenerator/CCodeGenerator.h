@@ -25,6 +25,7 @@
 namespace C2 {
 
 class Decl;
+class DeferStmt;
 class VarDecl;
 class TypeDecl;
 class FunctionDecl;
@@ -39,6 +40,8 @@ class CompoundStmt;
 class AsmStmt;
 class HeaderNamer;
 class TargetInfo;
+
+const size_t MAX_DEFERS = 256;
 
 // generates LLVM Module from (multiple) Module(s)
 class CCodeGenerator : public CTypeWriter {
@@ -108,6 +111,7 @@ private:
     void EmitConditionPost(const Stmt* S);
     bool EmitAttributes(const Decl* D, StringBuilder& output, bool addStartSpace);
 
+    void EmitDefers(const DeferStmt* top, unsigned indent);
     bool EmitAsStatic(const Decl* D) const;
     bool EmitAsDefine(const VarDecl* V) const;
 
@@ -125,8 +129,18 @@ private:
     std::string cfilename;
     std::string hfilename;
 
+    struct DeferStack {
+        unsigned stackDepth = 0;
+        const DeferStmt *statements[MAX_DEFERS];
+        void push(const DeferStmt *stmt) { statements[stackDepth++] = stmt; }
+        void pop() { stackDepth--; };
+        const DeferStmt *current() { return stackDepth > 0 ? statements[stackDepth - 1] : nullptr; }
+    };
+
+    DeferStack deferStack {};
     CCodeGenerator(const CCodeGenerator&);
     CCodeGenerator& operator= (const CCodeGenerator&);
+    void EmitDeferStmt(const DeferStmt* defer, unsigned int indent);
 };
 
 }

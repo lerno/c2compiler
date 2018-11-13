@@ -32,6 +32,7 @@ class VarDecl;
 class ASTContext;
 class IdentifierExpr;
 class StringLiteral;
+class DeferStmt;
 
 enum StmtKind {
     STMT_RETURN = 0,
@@ -50,6 +51,7 @@ enum StmtKind {
     STMT_COMPOUND,
     STMT_DECL,
     STMT_ASM,
+    STMT_DEFER,
 };
 
 
@@ -428,6 +430,8 @@ public:
     SourceLocation getLocation() const { return Loc; }
 private:
     SourceLocation Loc;
+public:
+    const DeferStmt* deferStmtAtScopeStart;
 };
 
 
@@ -442,6 +446,8 @@ public:
     SourceLocation getLocation() const { return Loc; }
 private:
     SourceLocation Loc;
+public:
+    const DeferStmt* deferStmtAtScopeStart;
 };
 
 
@@ -460,6 +466,8 @@ private:
     SourceLocation Loc;
     const char* name;
     Stmt* subStmt;
+public:
+    const DeferStmt* deferStmtTop;
 };
 
 
@@ -516,6 +524,24 @@ private:
     VarDecl* decl;
 };
 
+
+class DeferStmt : public Stmt {
+public:
+    DeferStmt(SourceLocation Loc_, Stmt* Defer_, CompoundStmt *CompoundStmt);
+    static bool classof(const Stmt* S) {
+        return S->getKind() == STMT_DEFER;
+    }
+
+    void print(StringBuilder& buffer, unsigned indent) const;
+    SourceLocation getLocation() const { return Loc; }
+
+    Stmt* getDefer() const { return Defer; }
+    CompoundStmt* getAfterDefer() const { return AfterDefer; }
+private:
+    SourceLocation Loc;
+    Stmt* Defer;
+    CompoundStmt* AfterDefer;
+};
 
 class AsmStmt : public Stmt {
 public:

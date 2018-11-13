@@ -68,6 +68,8 @@ void Stmt::print(StringBuilder& buffer, unsigned indent) const {
         return cast<DeclStmt>(this)->print(buffer, indent);
     case STMT_ASM:
         return cast<AsmStmt>(this)->print(buffer, indent);
+    case STMT_DEFER:
+        return cast<DeferStmt>(this)->print(buffer, indent);
     }
 }
 
@@ -105,6 +107,8 @@ SourceLocation Stmt::getLocation() const {
         return cast<DeclStmt>(this)->getLocation();
     case STMT_ASM:
         return cast<AsmStmt>(this)->getLocation();
+    case STMT_DEFER:
+        return cast<DeferStmt>(this)->getLocation();
     }
 }
 
@@ -193,6 +197,19 @@ void DoStmt::print(StringBuilder& buffer, unsigned indent) const {
     Then->print(buffer, indent + INDENT);
 }
 
+DeferStmt::DeferStmt(SourceLocation Loc_, Stmt* Defer_, CompoundStmt* AfterDefer_)
+    : Stmt(STMT_DEFER)
+    , Loc(Loc_)
+    , Defer(Defer_)
+    , AfterDefer(AfterDefer_)
+{}
+
+void DeferStmt::print(StringBuilder& buffer, unsigned indent) const {
+    buffer.indent(indent);
+    buffer.setColor(COL_STMT);
+    buffer << "DeferStmt\n";
+    Defer->print(buffer, indent + INDENT);
+}
 
 ForStmt::ForStmt(SourceLocation Loc_, Stmt* Init_, Expr* Cond_, Expr* Incr_, Stmt* Body_)
     : Stmt(STMT_FOR)
@@ -275,6 +292,7 @@ void DefaultStmt::print(StringBuilder& buffer, unsigned indent) const {
 BreakStmt::BreakStmt(SourceLocation Loc_)
     : Stmt(STMT_BREAK)
     , Loc(Loc_)
+    , deferStmtAtScopeStart(nullptr)
 {}
 
 void BreakStmt::print(StringBuilder& buffer, unsigned indent) const {
@@ -287,6 +305,7 @@ void BreakStmt::print(StringBuilder& buffer, unsigned indent) const {
 ContinueStmt::ContinueStmt(SourceLocation Loc_)
     : Stmt(STMT_CONTINUE)
     , Loc(Loc_)
+    , deferStmtAtScopeStart(nullptr)
 {}
 
 void ContinueStmt::print(StringBuilder& buffer, unsigned indent) const {

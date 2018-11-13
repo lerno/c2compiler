@@ -39,6 +39,7 @@ class EnumConstantDecl;
 class LabelDecl;
 class Stmt;
 class SwitchStmt;
+class DeferStmt;
 class Expr;
 class IdentifierExpr;
 class InitListExpr;
@@ -46,9 +47,10 @@ class MemberExpr;
 class CallExpr;
 class BuiltinExpr;
 class ASTContext;
-
+class GotoStmt;
 
 constexpr size_t MAX_STRUCT_INDIRECTION_DEPTH = 256;
+const size_t MAX_DEFERS = 256;
 
 class FunctionAnalyser {
 public:
@@ -81,6 +83,7 @@ private:
     void analyseReturnStmt(Stmt* stmt);
     void analyseDeclStmt(Stmt* stmt);
     void analyseAsmStmt(Stmt* stmt);
+    void analyseDeferStmt(Stmt* stmt);
     bool analyseCondition(Stmt* stmt);
     void analyseStmtExpr(Stmt* stmt);
 
@@ -162,6 +165,7 @@ private:
     bool usedPublicly;
     bool isInterface;
 
+
     // Our callstack (statically allocated)
     struct CallStack {
         Expr *structFunction[MAX_STRUCT_INDIRECTION_DEPTH];
@@ -172,7 +176,19 @@ private:
         void setStructFunction(Expr* expr) { structFunction[callDepth - 1] = expr; }
     };
 
+    struct DeferStack {
+        size_t stackDepth = 0;
+        const DeferStmt *statements[MAX_DEFERS];
+        bool reachedMax() { return stackDepth == MAX_DEFERS; };
+        void push(const DeferStmt *stmt) { statements[stackDepth++] = stmt; }
+        void pop() { stackDepth--; };
+        const DeferStmt *current() { return stackDepth > 0 ? statements[stackDepth - 1] : nullptr; }
+    };
+
+    DeferStack deferStack {};
+
     CallStack callStack;
+
 
     typedef std::vector<LabelDecl*> Labels;
     typedef Labels::iterator LabelsIter;
@@ -180,6 +196,7 @@ private:
 
     FunctionAnalyser(const FunctionAnalyser&);
     FunctionAnalyser& operator= (const FunctionAnalyser&);
+    void analyseDeferLocalGotos(Stmt* stmt, Labels &labelsFoundBeforeDefer);
 };
 
 }

@@ -26,10 +26,7 @@
 #include "Analyser/LiteralAnalyser.h"
 #include "Analyser/Scope.h"
 #include "Analyser/AnalyserConstants.h"
-#include "AST/Decl.h"
 #include "AST/Expr.h"
-#include "AST/Stmt.h"
-#include "AST/ASTContext.h"
 #include "Utils/color.h"
 #include "Utils/StringBuilder.h"
 
@@ -39,7 +36,7 @@ using namespace c2lang;
 //#define ANALYSER_DEBUG
 
 #ifdef ANALYSER_DEBUG
-#include "Utils/color.h"
+
 #include <iostream>
 #define LOG_FUNC std::cerr << ANSI_MAGENTA << __func__ << "()" << ANSI_NORMAL << "\n";
 #else
@@ -109,6 +106,7 @@ FunctionAnalyser::FunctionAnalyser(Scope& scope_,
     , isInterface(isInterface_)
 {
     callStack.callDepth = 0;
+    deferStack.stackDepth = 0;
 }
 
 void FunctionAnalyser::check(FunctionDecl* func) {
@@ -121,7 +119,9 @@ void FunctionAnalyser::check(FunctionDecl* func) {
     }
 
     CurrentFunction = func;
-    scope.EnterScope(Scope::FnScope | Scope::DeclScope);
+    deferStack.stackDepth = 0;
+
+    scope.EnterScope(Scope::FnScope | Scope::DeclScope, nullptr);
 
     checkFunction(func);
 
@@ -130,12 +130,14 @@ void FunctionAnalyser::check(FunctionDecl* func) {
     // check labels
     for (LabelsIter iter = labels.begin(); iter != labels.end(); ++iter) {
         LabelDecl* LD = *iter;
-        if (LD->getStmt()) {    // have label part
-            if (!LD->isUsed()) {
-                Diag(LD->getLocation(), diag::warn_unused_label) << LD->DiagName();
-            }
-        } else {    // only have goto part
-            Diag(LD->getLocation(), diag:: err_undeclared_label_use) << LD->DiagName();
+        // Only the goto?
+        if (!LD->getStmt()) {
+            Diag(LD->getLocation(), diag::err_undeclared_label_use) << LD->DiagName();
+            continue;
+        }
+        // Missing the goto?
+        if (!LD->isUsed()) {
+            Diag(LD->getLocation(), diag::warn_unused_label) << LD->DiagName();
         }
     }
     labels.clear();
@@ -199,7 +201,19 @@ unsigned FunctionAnalyser::checkEnumValue(EnumConstantDecl* E, llvm::APSInt& nex
     return 0;
 }
 
+static inline bool lastStatementHadReturn(Stmt *lastStatement)
+{
+    if (!lastStatement) return false;
+    if (lastStatement->getKind() == STMT_RETURN) return true;
+    if (lastStatement->getKind() == STMT_DEFER) {
+        CompoundStmt *stmt = cast<CompoundStmt>(cast<DeferStmt>(lastStatement)->getAfterDefer());
+        return lastStatementHadReturn(stmt->getLastStmt());
+    }
+    return false;
+}
+
 void FunctionAnalyser::checkFunction(FunctionDecl* func) {
+
     LOG_FUNC
     bool no_unused_params = func->hasAttribute(ATTR_UNUSED_PARAMS);
     if (isInterface) no_unused_params = true;
@@ -224,14 +238,12 @@ void FunctionAnalyser::checkFunction(FunctionDecl* func) {
     }
     if (scope.hasErrorOccurred()) return;
 
+
     // check for return statement of return value is required
     QualType rtype = func->getReturnType();
     bool need_rvalue = (rtype.getTypePtr() != BuiltinType::get(BuiltinType::Void));
-    if (need_rvalue && body) {
-        Stmt* lastStmt = body->getLastStmt();
-        if (!lastStmt || lastStmt->getKind() != STMT_RETURN) {
-            Diag(body->getRight(), diag::warn_falloff_nonvoid_function);
-        }
+    if (need_rvalue && body && !lastStatementHadReturn(body->getLastStmt())) {
+        Diag(body->getRight(), diag::warn_falloff_nonvoid_function);
     }
 }
 
@@ -276,7 +288,7 @@ void FunctionAnalyser::analyseStmt(Stmt* S, bool haveScope) {
         analyseGotoStmt(S);
         break;
     case STMT_COMPOUND:
-        if (!haveScope) scope.EnterScope(Scope::DeclScope);
+        if (!haveScope) scope.EnterScope(Scope::DeclScope, deferStack.current());
         analyseCompoundStmt(S);
         if (!haveScope) scope.ExitScope();
         break;
@@ -285,6 +297,9 @@ void FunctionAnalyser::analyseStmt(Stmt* S, bool haveScope) {
         break;
     case STMT_ASM:
         analyseAsmStmt(S);
+        break;
+    case STMT_DEFER:
+        analyseDeferStmt(S);
         break;
     }
 }
@@ -304,15 +319,15 @@ void FunctionAnalyser::analyseIfStmt(Stmt* stmt) {
     LOG_FUNC
     IfStmt* I = cast<IfStmt>(stmt);
 
-    scope.EnterScope(Scope::DeclScope);
+    scope.EnterScope(Scope::DeclScope, deferStack.current());
     analyseCondition(I->getCond());
 
-    scope.EnterScope(Scope::DeclScope);
+    scope.EnterScope(Scope::DeclScope, deferStack.current());
     analyseStmt(I->getThen(), true);
     scope.ExitScope();
 
     if (I->getElse()) {
-        scope.EnterScope(Scope::DeclScope);
+        scope.EnterScope(Scope::DeclScope, deferStack.current());
         analyseStmt(I->getElse(), true);
         scope.ExitScope();
     }
@@ -322,9 +337,9 @@ void FunctionAnalyser::analyseIfStmt(Stmt* stmt) {
 void FunctionAnalyser::analyseWhileStmt(Stmt* stmt) {
     LOG_FUNC
     WhileStmt* W = cast<WhileStmt>(stmt);
-    scope.EnterScope(Scope::DeclScope);
+    scope.EnterScope(Scope::DeclScope, deferStack.current());
     analyseStmt(W->getCond());
-    scope.EnterScope(Scope::BreakScope | Scope::ContinueScope | Scope::DeclScope | Scope::ControlScope);
+    scope.EnterScope(Scope::BreakScope | Scope::ContinueScope | Scope::DeclScope | Scope::ControlScope, deferStack.current());
     analyseStmt(W->getBody(), true);
     scope.ExitScope();
     scope.ExitScope();
@@ -333,16 +348,39 @@ void FunctionAnalyser::analyseWhileStmt(Stmt* stmt) {
 void FunctionAnalyser::analyseDoStmt(Stmt* stmt) {
     LOG_FUNC
     DoStmt* D = cast<DoStmt>(stmt);
-    scope.EnterScope(Scope::BreakScope | Scope::ContinueScope | Scope::DeclScope);
+    scope.EnterScope(Scope::BreakScope | Scope::ContinueScope | Scope::DeclScope, deferStack.current());
     analyseStmt(D->getBody());
     scope.ExitScope();
     analyseStmt(D->getCond());
 }
 
+void FunctionAnalyser::analyseDeferStmt(Stmt* stmt) {
+    LOG_FUNC
+    std::vector<LabelDecl *> preDeferLabels(32); // Possibly make this a clean array and set a max.
+    for (LabelDecl* labelDecl : labels)
+    {
+        if (labelDecl->getStmt())
+        {
+            preDeferLabels.push_back(labelDecl);
+        }
+    }
+    DeferStmt* D = cast<DeferStmt>(stmt);
+    scope.EnterScope(Scope::DeferScope, nullptr);
+    analyseStmt(D->getDefer());
+    scope.ExitScope();
+    analyseDeferLocalGotos(D->getDefer(), labels);
+    deferStack.push(D);
+    scope.EnterScope(Scope::FnScope, D);
+    analyseStmt(D->getAfterDefer(), true);
+    scope.ExitScope();
+    deferStack.pop();
+
+}
+
 void FunctionAnalyser::analyseForStmt(Stmt* stmt) {
     LOG_FUNC
     ForStmt* F = cast<ForStmt>(stmt);
-    scope.EnterScope(Scope::BreakScope | Scope::ContinueScope | Scope::DeclScope | Scope::ControlScope);
+    scope.EnterScope(Scope::BreakScope | Scope::ContinueScope | Scope::DeclScope | Scope::ControlScope, deferStack.current());
     if (F->getInit()) analyseStmt(F->getInit());
     if (F->getCond()) {
         QualType CT = analyseExpr(F->getCond(), RHS);
@@ -361,13 +399,13 @@ void FunctionAnalyser::analyseSwitchStmt(Stmt* stmt) {
     LOG_FUNC
     SwitchStmt* S = cast<SwitchStmt>(stmt);
 
-    scope.EnterScope(Scope::DeclScope);
+    scope.EnterScope(Scope::DeclScope, deferStack.current());
     if (!analyseCondition(S->getCond())) return;
 
     unsigned numCases = S->numCases();
     Stmt** cases = S->getCases();
     Stmt* defaultStmt = 0;
-    scope.EnterScope(Scope::BreakScope | Scope::SwitchScope);
+    scope.EnterScope(Scope::BreakScope | Scope::SwitchScope, deferStack.current());
     for (unsigned i=0; i<numCases; i++) {
         Stmt* C = cases[i];
         switch (C->getKind()) {
@@ -399,23 +437,28 @@ void FunctionAnalyser::analyseSwitchStmt(Stmt* stmt) {
 
 void FunctionAnalyser::analyseBreakStmt(Stmt* stmt) {
     LOG_FUNC
+    BreakStmt* B = cast<BreakStmt>(stmt);
     if (!scope.allowBreak()) {
-        BreakStmt* B = cast<BreakStmt>(stmt);
         Diag(B->getLocation(), diag::err_break_not_in_loop_or_switch);
+        return;
     }
+    B->deferStmtAtScopeStart = scope.getBreakDefer();
 }
 
 void FunctionAnalyser::analyseContinueStmt(Stmt* stmt) {
     LOG_FUNC
+    ContinueStmt* C = cast<ContinueStmt>(stmt);
     if (!scope.allowContinue()) {
-        ContinueStmt* C = cast<ContinueStmt>(stmt);
         Diag(C->getLocation(), diag::err_continue_not_in_loop);
+        return;
     }
+    C->deferStmtAtScopeStart = scope.getContinueDefer();
 }
 
 void FunctionAnalyser::analyseLabelStmt(Stmt* S) {
     LOG_FUNC
     LabelStmt* L = cast<LabelStmt>(S);
+    L->deferStmtTop = scope.getDeferStmtTop();
 
     LabelDecl* LD = LookupOrCreateLabel(L->getName(), L->getLocation());
     if (LD->getStmt()) {
@@ -465,6 +508,12 @@ void FunctionAnalyser::analyseDefaultStmt(Stmt* stmt) {
 void FunctionAnalyser::analyseReturnStmt(Stmt* stmt) {
     LOG_FUNC
     ReturnStmt* ret = cast<ReturnStmt>(stmt);
+    if (!scope.allowScopeExit()) {
+        // TODO DIAG
+        FATAL_ERROR("Return not allowed");
+        Diag(ret->getLocation(), diag::ext_return_has_expr);
+        return;
+    }
     Expr* value = ret->getExpr();
     QualType rtype = CurrentFunction->getReturnType();
     bool no_rvalue = (rtype.getTypePtr() == Type::Void());
@@ -574,6 +623,7 @@ void FunctionAnalyser::analyseAsmStmt(Stmt* stmt) {
         analyseExpr(c, 0);
     }
 }
+
 
 bool FunctionAnalyser::analyseCondition(Stmt* stmt) {
     LOG_FUNC
@@ -2252,4 +2302,41 @@ QualType FunctionAnalyser::UsualUnaryConversions(Expr* expr) const {
 
     return expr->getType();
 }
+
+
+void FunctionAnalyser::analyseDeferLocalGotos(Stmt* stmt, Labels &labelsFoundBeforeDefer) {
+    switch (stmt->getKind())
+    {
+        case StmtKind::STMT_COMPOUND:
+        {
+            CompoundStmt *compoundStmt = cast<CompoundStmt>(stmt);
+            unsigned numStmts = compoundStmt->numStmts();
+            Stmt** stmts = compoundStmt->getStmts();
+            for (unsigned i = 0; i < numStmts; i++) {
+                analyseDeferLocalGotos(stmts[i], labelsFoundBeforeDefer);
+            }
+            break;
+        }
+        case StmtKind::STMT_GOTO:
+        {
+            GotoStmt *gotoStmt = cast<GotoStmt>(stmt);
+            LabelDecl *labelDecl = cast<LabelDecl>(gotoStmt->getLabel()->getDecl());
+            if (!labelDecl->getStmt()) {
+                TODO;
+                // Add diagnostics about goto must not exit defer.
+            }
+
+            // Is the label completed before the defer was parsed?
+            if (std::find(labelsFoundBeforeDefer.begin(), labelsFoundBeforeDefer.end(), labelDecl)
+                != labelsFoundBeforeDefer.end())
+            {
+                TODO;
+                // Add diagnostics about goto must not exit defer.
+            }
+        }
+        default:
+            break;
+    }
+}
+
 

@@ -172,13 +172,14 @@ C2Sema::C2Sema(SourceManager& sm_, DiagnosticsEngine& Diags_, c2lang::Preprocess
     checkSize(IfStmt, 48);
     checkSize(WhileStmt, 24);
     checkSize(DoStmt, 24);
+    checkSize(DeferStmt, 24);
     checkSize(ForStmt, 40);
     checkSize(SwitchStmt, 24);
     checkSize(CaseStmt, 24);
     checkSize(DefaultStmt, 16);
-    checkSize(BreakStmt, 8);
-    checkSize(ContinueStmt, 8);
-    checkSize(LabelStmt, 24);
+    checkSize(BreakStmt, 16);
+    checkSize(ContinueStmt, 16);
+    checkSize(LabelStmt, 32);
     checkSize(GotoStmt, 24);
     checkSize(CompoundStmt, 24);
     checkSize(DeclStmt, 16);
@@ -650,6 +651,17 @@ C2::StmtResult C2Sema::ActOnDoStmt(SourceLocation loc, ExprResult Cond, StmtResu
     MEM_STMT(STMT_DO);
     return StmtResult(new (Context) DoStmt(loc, Cond.get(), Then.get()));
 }
+
+C2::StmtResult C2Sema::ActOnDeferStmt(SourceLocation loc, StmtResult deferStmt, StmtResult compoundStmt) {
+#ifdef SEMA_DEBUG
+    std::cerr << COL_SEMA"SEMA: defer statement at ";
+    loc.dump(SourceMgr);
+    std::cerr << ANSI_NORMAL"\n";
+#endif
+    MEM_STMT(STMT_DEFER);
+    return StmtResult(new (Context) DeferStmt(loc, deferStmt.get(), cast<CompoundStmt>(compoundStmt.get())));
+}
+
 
 C2::StmtResult C2Sema::ActOnForStmt(SourceLocation loc, Stmt* Init, Expr* Cond, Expr* Incr, Stmt* Body) {
 #ifdef SEMA_DEBUG

@@ -1,0 +1,51 @@
+// @warnings{no-unused}
+module test;
+
+public func void test1() {
+    i32 a = 0;
+    {
+        defer { a++; 
+            goto label1; // @error{'goto' statement may not jump outside of defer}
+        }
+        label1:
+        a = a + 1;
+    }
+}
+
+public func void test2() {
+    i32 a = 0;
+    defer { 
+        a++; 
+        goto label1; // Allowed!
+        a += 2;
+        label1:
+        a += 3;
+    }
+}
+
+public func void test3() {
+    defer { a++; 
+        return; // @error{'return' statement not allowed inside of defer}
+    }
+}
+
+public func void test4() {
+    while (0)
+    {
+        defer {              
+            continue; // @error{'continue' statement not allowed inside of defer}
+        }            
+    }
+}
+
+public func void test5() {
+    while (0)
+    {
+        defer { 
+            while (1) {
+                continue; // This is allowed                    
+            }
+        }
+    }
+}
+

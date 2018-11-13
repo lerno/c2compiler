@@ -106,7 +106,13 @@ C2Parser::C2Parser(Preprocessor& pp, C2Sema& sema, bool isInterface_)
 C2Parser::~C2Parser() {}
 
 bool C2Parser::Parse() {
+
+
     LOG_FUNC
+
+    // Clear the push backed token.
+    PushedBackToken.setKind(tok::TokenKind::unknown);
+
     // Prime the lexer look-ahead.
     ConsumeToken();
 
@@ -1646,6 +1652,8 @@ C2::StmtResult C2Parser::ParseStatement() {
         Diag(Tok, diag::err_default_not_in_switch);
         return StmtError();
         // all basic types
+    case tok::kw_defer:
+        return ParseDeferStatement();
     case tok::kw_u8:
     case tok::kw_u16:
     case tok::kw_u32:
@@ -1861,6 +1869,20 @@ C2::StmtResult C2Parser::ParseReturnStatement() {
 
     if (ExpectAndConsume(tok::semi, diag::err_expected_after, "return")) return StmtError();
     return Actions.ActOnReturnStmt(loc, result.get());
+}
+
+// Syntax: defer statement ';'
+C2::StmtResult C2Parser::ParseDeferStatement() {
+    LOG_FUNC
+    assert(Tok.is(tok::kw_defer) && "Not a defer stmt!");
+    SourceLocation Loc = ConsumeToken();
+    StmtResult defer = ParseStatement();
+    if (defer.isInvalid()) return StmtError();
+    PushToken(tok::l_brace);
+    StmtResult remainingBody = ParseCompoundStatement();
+    PushToken(tok::r_brace);
+    StmtResult Res = Actions.ActOnDeferStmt(Loc, defer, remainingBody);
+    return Res;
 }
 
 /// ParseIfStatement
