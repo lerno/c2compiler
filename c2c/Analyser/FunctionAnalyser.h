@@ -38,6 +38,7 @@ class FunctionDecl;
 class EnumConstantDecl;
 class LabelDecl;
 class Stmt;
+class LabelStmt;
 class SwitchStmt;
 class DeferStmt;
 class Expr;
@@ -51,7 +52,6 @@ class GotoStmt;
 
 constexpr size_t MAX_STRUCT_INDIRECTION_DEPTH = 256;
 const size_t MAX_DEFERS = 256;
-
 class FunctionAnalyser {
 public:
     FunctionAnalyser(Scope& scope_,
@@ -115,7 +115,6 @@ private:
     QualType analyseEnumMinMaxExpr(BuiltinExpr* B, bool isMin);
     void analyseArrayType(VarDecl* V, QualType T);
     void analyseArraySizeExpr(ArrayType* AT);
-
     c2lang::DiagnosticBuilder Diag(c2lang::SourceLocation Loc, unsigned DiagID) const;
     void pushMode(unsigned DiagID);
     void popMode();
@@ -165,6 +164,7 @@ private:
     bool usedPublicly;
     bool isInterface;
 
+    unsigned deferId;
 
     // Our callstack (statically allocated)
     struct CallStack {
@@ -192,11 +192,10 @@ private:
 
     typedef std::vector<LabelDecl*> Labels;
     typedef Labels::iterator LabelsIter;
-    Labels labels;
+    Labels labels {};
 
     FunctionAnalyser(const FunctionAnalyser&);
     FunctionAnalyser& operator= (const FunctionAnalyser&);
-    void analyseDeferLocalGotos(Stmt* stmt, Labels &labelsFoundBeforeDefer);
 };
 
 }

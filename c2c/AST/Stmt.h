@@ -98,6 +98,26 @@ protected:
         unsigned numCases : 32 - NumStmtBits;
     };
 
+
+    class BreakStmtBitfields {
+        friend class LabelStmt;
+        unsigned : NumStmtBits;
+        unsigned inDefer : 16;
+    };
+
+    class DeferStmtBitfields {
+        friend class DeferStmt;
+        unsigned : NumStmtBits;
+        unsigned deferId : 16;
+        unsigned needBoolean : 1;
+    };
+
+    class GotoStmtBitfields {
+        friend class GotoStmt;
+        unsigned : NumStmtBits;
+        unsigned inDefer : 16;
+    };
+
     class CaseStmtBitfields {
         friend class CaseStmt;
         unsigned : NumStmtBits;
@@ -216,14 +236,12 @@ protected:
     class DesignatedInitExprBitfields {
         friend class DesignatedInitExpr;
         unsigned : NumExprBits;
-
         unsigned DesignatorKind : 1;
     };
 
     class BitOffsetExprBitfields {
         friend class BitOffsetExpr;
         unsigned : NumExprBits;
-
         unsigned width : 8;
     };
 
@@ -234,6 +252,9 @@ protected:
         DefaultStmtBitfields defaultStmtBits;
         CompoundStmtBitfields compoundStmtBits;
         AsmStmtBitFields asmStmtBits;
+        GotoStmtBitfields gotoStmtBits;
+        BreakStmtBitfields breakStmtBits;
+        DeferStmtBitfields deferStmtBits;
 
         ExprBitfields exprBits;
         IdentifierExprBitfields identifierExprBits;
@@ -432,6 +453,7 @@ private:
     SourceLocation Loc;
 public:
     const DeferStmt* deferStmtAtScopeStart;
+    const DeferStmt* inDefer;
 };
 
 
@@ -460,6 +482,8 @@ public:
 
     void print(StringBuilder& buffer, unsigned indent) const;
     SourceLocation getLocation() const { return Loc; }
+
+
     Stmt* getSubStmt() const { return subStmt; }
     const char* getName() const { return name; }
 private:
@@ -478,6 +502,8 @@ public:
         return S->getKind() == STMT_GOTO;
     }
 
+    unsigned inDefer() const { return gotoStmtBits.inDefer; }
+    void setInDefer(unsigned deferId) { gotoStmtBits.inDefer = deferId; }
     void print(StringBuilder& buffer, unsigned indent) const;
     SourceLocation getLocation() const { return GotoLoc; }
     IdentifierExpr* getLabel() const { return label; }
@@ -534,6 +560,8 @@ public:
 
     void print(StringBuilder& buffer, unsigned indent) const;
     SourceLocation getLocation() const { return Loc; }
+    unsigned deferId() const { return deferStmtBits.deferId; }
+    void setDeferId(unsigned id) { deferStmtBits.deferId = id; }
 
     Stmt* getDefer() const { return Defer; }
     CompoundStmt* getAfterDefer() const { return AfterDefer; }

@@ -157,6 +157,13 @@ protected:
         unsigned IsLocal : 1;
     };
 
+    class LabelDeclBits {
+        friend class LabelDecl;
+        unsigned : NumDeclBits;
+
+        unsigned inDefer : 16;
+    };
+
     union {
         DeclBitfields declBits;
         VarDeclBits varDeclBits;
@@ -164,6 +171,7 @@ protected:
         EnumTypeDeclBits enumTypeDeclBits;
         FunctionDeclBits functionDeclBits;
         ImportDeclBits importDeclBits;
+        LabelDeclBits labelDeclBits;
     };
     SourceLocation loc;
     QualType type;
@@ -454,6 +462,9 @@ public:
         return D->getKind() == DECL_LABEL;
     }
     void print(StringBuilder& buffer, unsigned indent) const;
+
+    unsigned inDefer() const { return labelDeclBits.inDefer; }
+    void setInDefer(unsigned deferId) { labelDeclBits.inDefer = deferId; }
 
     LabelStmt* getStmt() const { return TheStmt; }
     void setStmt(LabelStmt* S) { TheStmt = S; }

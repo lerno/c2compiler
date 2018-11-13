@@ -119,6 +119,7 @@ void FunctionAnalyser::check(FunctionDecl* func) {
     }
 
     CurrentFunction = func;
+    deferId = 0;
     deferStack.stackDepth = 0;
 
     scope.EnterScope(Scope::FnScope | Scope::DeclScope, nullptr);
@@ -141,7 +142,6 @@ void FunctionAnalyser::check(FunctionDecl* func) {
         }
     }
     labels.clear();
-
     CurrentFunction = 0;
 }
 
@@ -356,7 +356,7 @@ void FunctionAnalyser::analyseDoStmt(Stmt* stmt) {
 
 void FunctionAnalyser::analyseDeferStmt(Stmt* stmt) {
     LOG_FUNC
-    if (!scope.allowDefer()) {
+    if (scope.isDeferScope()) {
         TODO; // Diagnostics here, rejecting it.
     }
     std::vector<LabelDecl *> preDeferLabels(32); // Possibly make this a clean array and set a max.
@@ -368,10 +368,10 @@ void FunctionAnalyser::analyseDeferStmt(Stmt* stmt) {
         }
     }
     DeferStmt* D = cast<DeferStmt>(stmt);
+    D->setDeferId(++deferId);
     scope.EnterScope(Scope::DeferScope, nullptr);
     analyseStmt(D->getDefer());
     scope.ExitScope();
-    analyseDeferLocalGotos(D->getDefer(), labels);
     deferStack.push(D);
     scope.EnterScope(Scope::FnScope, D);
     analyseStmt(D->getAfterDefer(), true);
@@ -472,6 +472,19 @@ void FunctionAnalyser::analyseLabelStmt(Stmt* S) {
         LD->setLocation(L->getLocation());
     }
 
+    unsigned deferIdExpected = scope.isDeferScope() ? deferId : 0;
+
+    // If we already reached this label, check with the previously set value
+    if (!LD->isUsed()) {
+        if (LD->inDefer() != deferIdExpected) {
+            TODO; // Tried to jump to this label from defer but it's in the wrong one -> check which goto we should flag for error.
+            // Three cases: goto from defer out of defer, goto from one defer to another defer, goto into defer.
+            // Unify diagnostics from the goto statement.
+        }
+    } else {
+        LD->setInDefer(deferIdExpected);
+    }
+
     analyseStmt(L->getSubStmt());
     // substmt cannot be declaration
 
@@ -483,9 +496,22 @@ void FunctionAnalyser::analyseLabelStmt(Stmt* S) {
 void FunctionAnalyser::analyseGotoStmt(Stmt* S) {
     LOG_FUNC
     GotoStmt* G = cast<GotoStmt>(S);
+    if (scope.isDeferScope()) {
+        // This will always be true since we set the defer just before analysing the defer statement;
+        G->setInDefer(deferId);
+    }
     IdentifierExpr* label = G->getLabel();
     LabelDecl* LD = LookupOrCreateLabel(label->getName(), label->getLocation());
     label->setDecl(LD, IdentifierExpr::REF_LABEL);
+    // We do a check here if deferIds match
+    if (LD->getStmt() || LD->isUsed()) {
+        if (LD->inDefer() != G->inDefer()) {
+            TODO; // Unify this error reporting with the one from Label. Possibly tag as error and handle later?
+        }
+    } else {
+        // Otherwise just copy.
+        LD->setInDefer(G->inDefer());
+    }
     LD->setUsed();
 }
 
@@ -2304,42 +2330,6 @@ QualType FunctionAnalyser::UsualUnaryConversions(Expr* expr) const {
     }
 
     return expr->getType();
-}
-
-
-void FunctionAnalyser::analyseDeferLocalGotos(Stmt* stmt, Labels &labelsFoundBeforeDefer) {
-    switch (stmt->getKind())
-    {
-        case StmtKind::STMT_COMPOUND:
-        {
-            CompoundStmt *compoundStmt = cast<CompoundStmt>(stmt);
-            unsigned numStmts = compoundStmt->numStmts();
-            Stmt** stmts = compoundStmt->getStmts();
-            for (unsigned i = 0; i < numStmts; i++) {
-                analyseDeferLocalGotos(stmts[i], labelsFoundBeforeDefer);
-            }
-            break;
-        }
-        case StmtKind::STMT_GOTO:
-        {
-            GotoStmt *gotoStmt = cast<GotoStmt>(stmt);
-            LabelDecl *labelDecl = cast<LabelDecl>(gotoStmt->getLabel()->getDecl());
-            if (!labelDecl->getStmt()) {
-                TODO;
-                // Add diagnostics about goto must not exit defer.
-            }
-
-            // Is the label completed before the defer was parsed?
-            if (std::find(labelsFoundBeforeDefer.begin(), labelsFoundBeforeDefer.end(), labelDecl)
-                != labelsFoundBeforeDefer.end())
-            {
-                TODO;
-                // Add diagnostics about goto must not exit defer.
-            }
-        }
-        default:
-            break;
-    }
 }
 
 
