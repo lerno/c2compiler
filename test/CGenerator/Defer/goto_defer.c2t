@@ -7,17 +7,21 @@ module test;
 import stdio local;
 
 public func i32 main(i32 argc, const i8*[] argv) {
+    printf("---");
     label1:
     {
         printf("1");
         defer printf("deferA");
         if (argc == 0) goto label1;
         if (argc == 1) return -1;
-        if (argc == 2) goto label2;
+        {
+            defer printf("inner");
+            if (argc == 2) goto label2;
+        }
+        label2:
         defer printf("deferB");
         printf("2");
     }
-    label2:
     printf("3");
     return 0 + argc;
 }
@@ -28,40 +32,50 @@ public func i32 main(i32 argc, const i8*[] argv) {
 #include "stdio.h"
 
 int32_t main(int32_t argc, const char* argv[]) {
-    label1:
-      {
-        printf("1");
-        {
-          if ((argc == 0)) {
-            do {
-              printf("deferA");
-            } while(0);
-            goto label1;
-          }
-          if ((argc == 1)) {
-            do {
-              printf("deferA");
-            } while(0);
-            return -1;
-          }
-          if ((argc == 2)) {
-            do {
-              printf("deferA");
-            } while(0);
-            goto label2;
-          }
-          {
-            printf("2");
-          }
-          do {
-            printf("deferB");
-          } while(0);
-        }
+{
+  printf("---");
+label1:
+  {
+    printf("1");
+    {
+      if ((argc == 0)) {
         do {
           printf("deferA");
         } while(0);
+        goto label1;
       }
-    label2:
-      printf("3");
-      return (0 + argc);
+      if ((argc == 1)) {
+        do {
+          printf("deferA");
+        } while(0);
+        return -1;
+      }
+      {
+        {
+          if ((argc == 2)) {
+            do {
+              printf("inner");
+            } while(0);
+            goto label2;
+          }
+        }
+        do {
+          printf("inner");
+        } while(0);
+      }
+label2:
+      {
+        printf("2");
+      }
+      do {
+        printf("deferB");
+      } while(0);
+    }
+    do {
+      printf("deferA");
+    } while(0);
+  }
+  printf("3");
+  return (0 + argc);
+}
 }

@@ -291,11 +291,10 @@ Decl* Scope::findSymbolInUsed(const std::string& symbol) const {
 }
 #endif
 
-void Scope::EnterScope(unsigned flags, const DeferStmt* deferTop) {
+void Scope::EnterScope(unsigned flags) {
     assert (scopeIndex < MAX_SCOPE_DEPTH && "out of scopes");
     DynamicScope* parent = curScope;
     curScope = scopes[scopeIndex];
-    curScope->lastDefer = deferTop;
     curScope->reset(flags);
     if (parent) {
         if (parent->Flags & BreakScope) curScope->Flags |= BreakScope;
@@ -337,18 +336,3 @@ const Module* Scope::findAnyModule(const char* name_) const {
 }
 
 
-const DeferStmt* Scope::getBreakDefer() {
-
-    for (unsigned i = scopeIndex - 1; i >= 1; --i) {
-        if ((scopes[i - 1]->Flags & BreakScope) == 0) return scopes[i]->lastDefer;
-    }
-    FATAL_ERROR("Should not be used without a place to break to");
-}
-
-const DeferStmt* Scope::getContinueDefer() {
-
-    for (unsigned i = scopeIndex - 1; i >= 1; --i) {
-        if ((scopes[i - 1]->Flags & ContinueScope) == 0) return scopes[i]->lastDefer;
-    }
-    FATAL_ERROR("Should not be used without a place to continue to");
-}

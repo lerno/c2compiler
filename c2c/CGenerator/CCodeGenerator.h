@@ -81,7 +81,7 @@ private:
     void EmitVarDecl(const VarDecl* D, StringBuilder& output, unsigned indent);
 
     void EmitStmt(const Stmt* S, unsigned indent);
-    void EmitCompoundStmt(const CompoundStmt* C, unsigned indent, bool startOnNewLine);
+    void EmitCompoundStmt(const CompoundStmt* C, unsigned indent, bool skipBraces);
     void EmitIfStmt(const Stmt* S, unsigned indent);
     void EmitWhileStmt(const Stmt* S, unsigned indent);
     void EmitDoStmt(const Stmt* S, unsigned indent);
@@ -112,7 +112,7 @@ private:
     void EmitConditionPost(const Stmt* S);
     bool EmitAttributes(const Decl* D, StringBuilder& output, bool addStartSpace);
 
-    void EmitDefers(const DeferStmt* top, unsigned indent);
+    void EmitDefers(DeferStmt** deferList, unsigned indent);
     bool EmitAsStatic(const Decl* D) const;
     bool EmitAsDefine(const VarDecl* V) const;
 
@@ -130,15 +130,6 @@ private:
     std::string cfilename;
     std::string hfilename;
 
-    struct DeferStack {
-        unsigned stackDepth = 0;
-        const DeferStmt *statements[MAX_DEFERS];
-        void push(const DeferStmt *stmt) { statements[stackDepth++] = stmt; }
-        void pop() { stackDepth--; };
-        const DeferStmt *current() { return stackDepth > 0 ? statements[stackDepth - 1] : nullptr; }
-    };
-
-    DeferStack deferStack {};
     CCodeGenerator(const CCodeGenerator&);
     CCodeGenerator& operator= (const CCodeGenerator&);
     void EmitDeferStmt(const DeferStmt* defer, unsigned indent);

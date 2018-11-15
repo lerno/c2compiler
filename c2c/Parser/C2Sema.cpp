@@ -144,7 +144,7 @@ C2Sema::C2Sema(SourceManager& sm_, DiagnosticsEngine& Diags_, c2lang::Preprocess
 
     checkSize(Decl, 32);
     checkSize(VarDecl, 56);
-    checkSize(FunctionDecl, 80);
+    checkSize(FunctionDecl, 88);
     checkSize(EnumConstantDecl, 56);
     checkSize(ArrayValueDecl, 40);
     checkSize(ImportDecl, 48);
@@ -168,7 +168,7 @@ C2Sema::C2Sema(SourceManager& sm_, DiagnosticsEngine& Diags_, c2lang::Preprocess
 	checkSize(ModuleType, 24);
 
     checkSize(Stmt, 8);
-    checkSize(ReturnStmt, 16);
+    checkSize(ReturnStmt, 24);
     checkSize(IfStmt, 48);
     checkSize(WhileStmt, 24);
     checkSize(DoStmt, 24);
@@ -180,7 +180,7 @@ C2Sema::C2Sema(SourceManager& sm_, DiagnosticsEngine& Diags_, c2lang::Preprocess
     checkSize(BreakStmt, 16);
     checkSize(ContinueStmt, 16);
     checkSize(LabelStmt, 32);
-    checkSize(GotoStmt, 24);
+    checkSize(GotoStmt, 32);
     checkSize(CompoundStmt, 24);
     checkSize(DeclStmt, 16);
 

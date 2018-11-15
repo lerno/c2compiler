@@ -50,7 +50,6 @@ struct DynamicScope {
     typedef std::vector<VarDecl*> Decls;
     typedef Decls::const_iterator DeclsConstIter;
     Decls decls;
-    const DeferStmt* lastDefer;
 };
 
 
@@ -105,12 +104,9 @@ public:
     void checkAccess(Decl* D, c2lang::SourceLocation loc) const;
 
     // Scopes
-    void EnterScope(unsigned flags, const DeferStmt* topDefer);
+    void EnterScope(unsigned flags);
     void ExitScope();
 
-    const DeferStmt* getBreakDefer();
-    const DeferStmt* getContinueDefer();
-    const DeferStmt* getDeferStmtTop() { return curScope->lastDefer; };
     bool hasErrorOccurred() const { return curScope->hasErrorOccurred(); }
 
     bool allowBreak()    const { return curScope->Flags & BreakScope; }

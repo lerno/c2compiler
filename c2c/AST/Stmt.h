@@ -117,7 +117,7 @@ protected:
         friend class DeferStmt;
         unsigned : NumStmtBits;
         unsigned deferId : 16;
-        unsigned needBoolean : 1;
+        unsigned emitBoolean : 1;
     };
 
     class GotoStmtBitfields {
@@ -301,6 +301,8 @@ public:
 private:
     SourceLocation RetLoc;
     Expr* value;
+public:
+    DeferStmt **deferStmts;
 };
 
 
@@ -463,7 +465,7 @@ public:
 private:
     SourceLocation Loc;
 public:
-    const DeferStmt* deferStmtAtScopeStart;
+    DeferStmt** deferStmts;
 };
 
 
@@ -479,7 +481,7 @@ public:
 private:
     SourceLocation Loc;
 public:
-    const DeferStmt* deferStmtAtScopeStart;
+    DeferStmt** deferStmts;
 };
 
 
@@ -523,6 +525,8 @@ public:
 private:
     IdentifierExpr* label;
     SourceLocation GotoLoc;
+public:
+    DeferStmt** deferStmts;
 };
 
 
@@ -573,8 +577,12 @@ public:
 
     void print(StringBuilder& buffer, unsigned indent) const;
     SourceLocation getLocation() const { return Loc; }
+
     unsigned deferId() const { return deferStmtBits.deferId; }
     void setDeferId(unsigned id) { deferStmtBits.deferId = id; }
+
+    void setEmitBoolean(bool emit) { deferStmtBits.emitBoolean = emit; };
+    bool shouldEmitBoolean() const { return deferStmtBits.emitBoolean; }
 
     Stmt* getDefer() const { return Defer; }
     CompoundStmt* getAfterDefer() const { return AfterDefer; }

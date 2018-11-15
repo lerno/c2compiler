@@ -157,6 +157,7 @@ FunctionDecl::FunctionDecl(const char* name_, SourceLocation loc_,
     , args(0)
     , body(0)
     , IRProto(0)
+    , conditionalDefers(0)
 {
     functionDeclBits.StructFuncNameOffset = 0;
     functionDeclBits.numArgs = 0;

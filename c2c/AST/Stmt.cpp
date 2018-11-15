@@ -292,7 +292,7 @@ void DefaultStmt::print(StringBuilder& buffer, unsigned indent) const {
 BreakStmt::BreakStmt(SourceLocation Loc_)
     : Stmt(STMT_BREAK)
     , Loc(Loc_)
-    , deferStmtAtScopeStart(nullptr)
+    , deferStmts(nullptr)
 {}
 
 void BreakStmt::print(StringBuilder& buffer, unsigned indent) const {
@@ -305,7 +305,7 @@ void BreakStmt::print(StringBuilder& buffer, unsigned indent) const {
 ContinueStmt::ContinueStmt(SourceLocation Loc_)
     : Stmt(STMT_CONTINUE)
     , Loc(Loc_)
-    , deferStmtAtScopeStart(nullptr)
+    , deferStmts(nullptr)
 {}
 
 void ContinueStmt::print(StringBuilder& buffer, unsigned indent) const {
@@ -336,6 +336,7 @@ GotoStmt::GotoStmt(IdentifierExpr* label_, SourceLocation GotoLoc_)
     : Stmt(STMT_GOTO)
     , label(label_)
     , GotoLoc(GotoLoc_)
+    , deferStmts(nullptr)
 {}
 
 void GotoStmt::print(StringBuilder& buffer, unsigned indent) const {

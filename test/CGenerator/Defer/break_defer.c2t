@@ -49,8 +49,7 @@ int32_t main(int32_t argc, const char* argv[]) {
                 break;
             }
             printf("Defer");
-        }
-        while(0);
+        } while(0);
     }
     {
         while (a) {
