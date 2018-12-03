@@ -1884,11 +1884,7 @@ C2::StmtResult C2Parser::ParseDeferStatement() {
     SourceLocation Loc = ConsumeToken();
     StmtResult defer = ParseStatement();
     if (defer.isInvalid()) return StmtError();
-    PushToken(tok::l_brace);
-    StmtResult remainingBody = ParseCompoundStatement();
-    PushToken(tok::r_brace);
-    StmtResult Res = Actions.ActOnDeferStmt(Loc, defer, remainingBody);
-    return Res;
+    return Actions.ActOnDeferStmt(Loc, defer);
 }
 
 /// ParseIfStatement

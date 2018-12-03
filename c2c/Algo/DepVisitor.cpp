@@ -132,95 +132,95 @@ void DepVisitor::checkType(QualType Q, bool isFullDep) {
 void DepVisitor::checkStmt(const Stmt* S) {
     assert(S);
     switch (S->getKind()) {
-    case STMT_RETURN:
-    {
-        const ReturnStmt* R = cast<ReturnStmt>(S);
-        if (R->getExpr()) checkExpr(R->getExpr());
-        break;
-    }
-    case STMT_EXPR:
-        checkExpr(cast<Expr>(S));
-        break;
-    case STMT_IF:
-    {
-        const IfStmt* I = cast<IfStmt>(S);
-        checkStmt(I->getCond());
-        checkStmt(I->getThen());
-        if (I->getElse()) checkStmt(I->getElse());
-        break;
-    }
-    case STMT_WHILE:
-    {
-        const WhileStmt* W = cast<WhileStmt>(S);
-        checkStmt(W->getCond());
-        checkStmt(W->getBody());
-        break;
-    }
-    case STMT_DO:
-    {
-        const DoStmt* D = cast<DoStmt>(S);
-        checkStmt(D->getCond());
-        checkStmt(D->getBody());
-        break;
-    }
-    case STMT_DEFER:
-    {
-        const DeferStmt* D = cast<DeferStmt>(S);
-        checkStmt(D->getDefer());
-        checkStmt(D->getAfterDefer());
-    }
-    case STMT_FOR:
-    {
-        const ForStmt* F = cast<ForStmt>(S);
-        if (F->getInit()) checkStmt(F->getInit());
-        if (F->getCond()) checkExpr(F->getCond());
-        if (F->getIncr()) checkExpr(F->getIncr());
-        checkStmt(F->getBody());
-        break;
-    }
-    case STMT_SWITCH:
-    {
-        const SwitchStmt* SW = cast<SwitchStmt>(S);
-        checkStmt(SW->getCond());
-        Stmt** cases = SW->getCases();
-        for (unsigned i=0; i<SW->numCases(); i++) {
-            checkStmt(cases[i]);
+        case STMT_RETURN:
+        {
+            const ReturnStmt* R = cast<ReturnStmt>(S);
+            if (R->getExpr()) checkExpr(R->getExpr());
+            break;
         }
-        break;
-    }
-    case STMT_CASE:
-    {
-        const CaseStmt* C = cast<CaseStmt>(S);
-        checkExpr(C->getCond());
-        Stmt** stmts = C->getStmts();
-        for (unsigned i=0; i<C->numStmts(); i++) {
-            checkStmt(stmts[i]);
+        case STMT_EXPR:
+            checkExpr(cast<Expr>(S));
+            break;
+        case STMT_IF:
+        {
+            const IfStmt* I = cast<IfStmt>(S);
+            checkStmt(I->getCond());
+            checkStmt(I->getThen());
+            if (I->getElse()) checkStmt(I->getElse());
+            break;
         }
-        break;
-    }
-    case STMT_DEFAULT:
-    {
-        const DefaultStmt* D = cast<DefaultStmt>(S);
-        Stmt** stmts = D->getStmts();
-        for (unsigned i=0; i<D->numStmts(); i++) {
-            checkStmt(stmts[i]);
+        case STMT_WHILE:
+        {
+            const WhileStmt* W = cast<WhileStmt>(S);
+            checkStmt(W->getCond());
+            checkStmt(W->getBody());
+            break;
         }
-        break;
-    }
-    case STMT_BREAK:
-    case STMT_CONTINUE:
-    case STMT_LABEL:
-    case STMT_GOTO:
-        break;
-    case STMT_COMPOUND:
-        checkCompoundStmt(cast<CompoundStmt>(S));
-        break;
-    case STMT_DECL:
-        checkVarDecl(cast<DeclStmt>(S)->getDecl());
-        break;
-    case STMT_ASM:
-        checkAsmStmt(cast<AsmStmt>(S));
-        break;
+        case STMT_DO:
+        {
+            const DoStmt* D = cast<DoStmt>(S);
+            checkStmt(D->getCond());
+            checkStmt(D->getBody());
+            break;
+        }
+        case STMT_DEFER:
+            checkStmt(cast<DeferStmt>(S)->getDefer());
+            break;
+        case STMT_DEFER_RELEASED:
+            checkStmt(cast<DeferReleasedStmt>(S)->getStmt());
+            break;
+        case STMT_FOR:
+        {
+            const ForStmt* F = cast<ForStmt>(S);
+            if (F->getInit()) checkStmt(F->getInit());
+            if (F->getCond()) checkExpr(F->getCond());
+            if (F->getIncr()) checkExpr(F->getIncr());
+            checkStmt(F->getBody());
+            break;
+        }
+        case STMT_SWITCH:
+        {
+            const SwitchStmt* SW = cast<SwitchStmt>(S);
+            checkStmt(SW->getCond());
+            Stmt** cases = SW->getCases();
+            for (unsigned i=0; i<SW->numCases(); i++) {
+                checkStmt(cases[i]);
+            }
+            break;
+        }
+        case STMT_CASE:
+        {
+            const CaseStmt* C = cast<CaseStmt>(S);
+            checkExpr(C->getCond());
+            Stmt** stmts = C->getStmts();
+            for (unsigned i=0; i<C->numStmts(); i++) {
+                checkStmt(stmts[i]);
+            }
+            break;
+        }
+        case STMT_DEFAULT:
+        {
+            const DefaultStmt* D = cast<DefaultStmt>(S);
+            Stmt** stmts = D->getStmts();
+            for (unsigned i=0; i<D->numStmts(); i++) {
+                checkStmt(stmts[i]);
+            }
+            break;
+        }
+        case STMT_BREAK:
+        case STMT_CONTINUE:
+        case STMT_LABEL:
+        case STMT_GOTO:
+            break;
+        case STMT_COMPOUND:
+            checkCompoundStmt(cast<CompoundStmt>(S));
+            break;
+        case STMT_DECL:
+            checkVarDecl(cast<DeclStmt>(S)->getDecl());
+            break;
+        case STMT_ASM:
+            checkAsmStmt(cast<AsmStmt>(S));
+            break;
     }
 }
 

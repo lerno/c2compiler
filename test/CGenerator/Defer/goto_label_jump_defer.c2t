@@ -26,23 +26,23 @@ int32_t main(int32_t argc, const char* argv[]) {
   char __defer_cond_1 = 0;
   char __defer_cond_2 = 0;
   int32_t a = 0;
-  if ((argc == 0)) {
+  if (argc == 0) {
     goto label1;
   }
   __defer_cond_1 = 1;
 label1:
-    printf("1");
-    if ((argc == 1)) {
-      goto label2;
-    }
-    __defer_cond_2 = 1;
+  printf("1");
+  if (argc == 1) {
+    goto label2;
+  }
+  __defer_cond_2 = 1;
 label2:
-      printf("2");
-      if (__defer_cond_2) do {
-        printf("B");
-      } while(0);
-      if (__defer_cond_1) do {
-        printf("A");
-      } while(0);
-      return 1;
+  printf("2");
+  if (__defer_cond_2) {
+    printf("B");
+  }
+  if (__defer_cond_1) {
+    printf("A");
+  }
+  return 1;
 }

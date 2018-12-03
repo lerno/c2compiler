@@ -121,31 +121,34 @@ void FunctionAnalyser::check(FunctionDecl* func) {
     CurrentFunction = func;
     deferId = 0;
     conditionalDefers.clear();
-    deferDepth = 0;
-    deferWalk.clear();
+    gotos.clear();
 
     scope.EnterScope(Scope::FnScope | Scope::DeclScope);
 
     checkFunction(func);
 
-    scope.ExitScope();
+    Stmt *stmt = func->getBody();
+    scope.ExitScope(Context, &stmt);
 
+    bool runGotoCheck = true;
     // check labels
     for (LabelsIter iter = labels.begin(); iter != labels.end(); ++iter) {
         LabelDecl* LD = *iter;
-        // Only the goto?
         if (!LD->getStmt()) {
+            // Missing label, so don't do the goto check.
+            runGotoCheck = false;
             Diag(LD->getLocation(), diag::err_undeclared_label_use) << LD->DiagName();
             continue;
         }
-        // Missing the goto?
         if (!LD->isUsed()) {
             Diag(LD->getLocation(), diag::warn_unused_label) << LD->DiagName();
         }
         LD->getStmt()->setInDefer(LD->inDefer());
     }
 
-    analyseDeferWalk();
+    if (runGotoCheck) {
+        analyseDeferGoto();
+    }
 
     // We need to add a list of defer variables in the beginning of the function.
     size_t conditionalDefersFound = conditionalDefers.size();
@@ -221,10 +224,6 @@ static inline bool lastStatementHadReturn(Stmt *lastStatement)
 {
     if (!lastStatement) return false;
     if (lastStatement->getKind() == STMT_RETURN) return true;
-    if (lastStatement->getKind() == STMT_DEFER) {
-        CompoundStmt *stmt = cast<CompoundStmt>(cast<DeferStmt>(lastStatement)->getAfterDefer());
-        return lastStatementHadReturn(stmt->getLastStmt());
-    }
     return false;
 }
 
@@ -306,7 +305,9 @@ void FunctionAnalyser::analyseStmt(Stmt* S, bool haveScope) {
     case STMT_COMPOUND:
         if (!haveScope) scope.EnterScope(Scope::DeclScope);
         analyseCompoundStmt(S);
-        if (!haveScope) scope.ExitScope();
+        if (!haveScope) {
+            scope.ExitScope(Context, &S);
+        }
         break;
     case STMT_DECL:
         analyseDeclStmt(S);
@@ -317,7 +318,10 @@ void FunctionAnalyser::analyseStmt(Stmt* S, bool haveScope) {
     case STMT_DEFER:
         analyseDeferStmt(S);
         break;
+        case STMT_DEFER_RELEASED:
+            FATAL_ERROR("Synthetic stmt, should not be encountered");
     }
+
 }
 
 void FunctionAnalyser::analyseCompoundStmt(Stmt* stmt) {
@@ -337,55 +341,51 @@ void FunctionAnalyser::analyseIfStmt(Stmt* stmt) {
 
     scope.EnterScope(Scope::DeclScope);
     analyseCondition(I->getCond());
-
     scope.EnterScope(Scope::DeclScope);
     analyseStmt(I->getThen(), true);
-    scope.ExitScope();
-
+    scope.ExitScope(Context, I->getThenRef());
     if (I->getElse()) {
         scope.EnterScope(Scope::DeclScope);
         analyseStmt(I->getElse(), true);
-        scope.ExitScope();
+        scope.ExitScope(Context, I->getElseRef());
     }
-    scope.ExitScope();
+    scope.ExitScope(Context, I->getCondRef());
 }
 
 void FunctionAnalyser::analyseWhileStmt(Stmt* stmt) {
     LOG_FUNC
     WhileStmt* W = cast<WhileStmt>(stmt);
-    if (deferWalk.size()) {
-        pushDeferEntry(DeferWalk { DeferWalkEntry::BREAK_CONTINUE_START, .as.entryPoointStmt = stmt });
-    }
-    scope.EnterScope(Scope::DeclScope);
+    scope.EnterScope(Scope::DeclScope | Scope::ControlScope);
     analyseStmt(W->getCond());
-    scope.EnterScope(Scope::BreakScope | Scope::ContinueScope | Scope::DeclScope | Scope::ControlScope);
+    scope.EnterScope(Scope::BreakScope | Scope::ContinueScope | Scope::DeclScope);
     analyseStmt(W->getBody(), true);
-    scope.ExitScope();
-    scope.ExitScope();
-    if (deferWalk.size()) {
-        pushDeferEntry(DeferWalk { DeferWalkEntry::BREAK_CONTINUE_END, .as.entryPoointStmt = stmt });
-    }
+    scope.ExitScope(Context, W->getBodyRef());
+    // Control scope will prevent defer.
+    scope.ExitScope(Context, nullptr);
 }
 
 void FunctionAnalyser::analyseDoStmt(Stmt* stmt) {
     LOG_FUNC
-    if (deferWalk.size()) {
-        pushDeferEntry(DeferWalk { DeferWalkEntry::BREAK_CONTINUE_START, .as.entryPoointStmt = stmt });
-    }
-
     DoStmt* D = cast<DoStmt>(stmt);
+
     scope.EnterScope(Scope::BreakScope | Scope::ContinueScope | Scope::DeclScope);
     analyseStmt(D->getBody());
-    scope.ExitScope();
+    scope.ExitScope(Context, D->getBodyRef());
+
+    scope.EnterScope(Scope::DeclScope | Scope::ControlScope);
     analyseStmt(D->getCond());
-    if (deferWalk.size()) {
-        pushDeferEntry(DeferWalk { DeferWalkEntry::BREAK_CONTINUE_END, .as.entryPoointStmt = stmt });
-    }
+    scope.ExitScope(Context, nullptr);
 }
 
 void FunctionAnalyser::analyseDeferStmt(Stmt* stmt) {
     LOG_FUNC
     if (scope.isDeferScope()) {
+        Diag(stmt->getLocation(), diag::err_defer_in_defer);
+        return;
+    }
+
+    if (scope.isControlScope()) {
+        // TODO change message
         Diag(stmt->getLocation(), diag::err_defer_in_defer);
         return;
     }
@@ -399,23 +399,15 @@ void FunctionAnalyser::analyseDeferStmt(Stmt* stmt) {
     // Defer allows break but not continue.
     scope.EnterScope(Scope::DeferScope | Scope::BreakScope);
     analyseStmt(D->getDefer());
-    scope.ExitScope();
-
-    // Store the defer in a linear structure.
-    pushDeferEntry((DeferWalk) { .type = DeferWalkEntry::DEFER, .as.deferStmt = D });
-
-    analyseCompoundStmt(D->getAfterDefer());
-
-    // Store the exit point.
-    pushDeferEntry((DeferWalk) { .type = DeferWalkEntry::EXIT_DEFER, .as.deferStmt = D });
-
+    if (scope.hasBreaks()) {
+        D->setEmitDoWhile(true);
+    }
+    scope.ExitScope(Context, nullptr);
+    scope.pushDefer(D);
 }
 
 void FunctionAnalyser::analyseForStmt(Stmt* stmt) {
     LOG_FUNC
-    if (deferWalk.size()) {
-        pushDeferEntry(DeferWalk { DeferWalkEntry::BREAK_CONTINUE_START, .as.entryPoointStmt = stmt });
-    }
     ForStmt* F = cast<ForStmt>(stmt);
     scope.EnterScope(Scope::BreakScope | Scope::ContinueScope | Scope::DeclScope | Scope::ControlScope);
     if (F->getInit()) analyseStmt(F->getInit());
@@ -428,23 +420,19 @@ void FunctionAnalyser::analyseForStmt(Stmt* stmt) {
         }
     }
     if (F->getIncr()) analyseExpr(F->getIncr(), RHS);
-    analyseStmt(F->getBody(), true);
-    scope.ExitScope();
-    if (deferWalk.size()) {
-        pushDeferEntry(DeferWalk { DeferWalkEntry::BREAK_CONTINUE_END, .as.entryPoointStmt = stmt });
-    }
 
+    // We need to introduce a new scope for defer to work correctly.
+    scope.EnterScope(Scope::DeclScope);
+    analyseStmt(F->getBody(), true);
+    scope.ExitScope(Context, F->getBodyRef());
+    scope.ExitScope(Context, nullptr);
 }
 
 void FunctionAnalyser::analyseSwitchStmt(Stmt* stmt) {
     LOG_FUNC
     SwitchStmt* S = cast<SwitchStmt>(stmt);
 
-    if (deferWalk.size()) {
-        pushDeferEntry(DeferWalk { DeferWalkEntry::BREAK_START, .as.entryPoointStmt = stmt });
-    }
-
-    scope.EnterScope(Scope::DeclScope);
+    scope.EnterScope(Scope::DeclScope | Scope::ControlScope);
     if (!analyseCondition(S->getCond())) return;
 
     unsigned numCases = S->numCases();
@@ -476,13 +464,10 @@ void FunctionAnalyser::analyseSwitchStmt(Stmt* stmt) {
         checkEnumCases(S, ET);
     }
 
-    scope.ExitScope();
-    scope.ExitScope();
-
-    if (deferWalk.size()) {
-        pushDeferEntry(DeferWalk { DeferWalkEntry::BREAK_END, .as.entryPoointStmt = stmt });
-    }
-
+    // Since we have scopes for each statment, we know this is empty of defers.
+    scope.ExitScope(Context, nullptr);
+    // Since we have control scope, we know this is empty of defers.
+    scope.ExitScope(Context, nullptr);
 }
 
 void FunctionAnalyser::analyseBreakStmt(Stmt* stmt) {
@@ -492,10 +477,8 @@ void FunctionAnalyser::analyseBreakStmt(Stmt* stmt) {
         Diag(B->getLocation(), diag::err_break_not_in_loop_or_switch);
         return;
     }
-    // We can skip analysis for breaks if it's not in a defer scope.
-    if (deferDepth && !scope.isDeferScope()) {
-        pushDeferEntry((DeferWalk) { .type = DeferWalkEntry::BREAK, .as.breakStmt = B });
-    }
+    scope.setHasBreaks();
+    B->deferList = scope.exitScopeDefers(Scope::BreakScope);
 }
 
 void FunctionAnalyser::analyseContinueStmt(Stmt* stmt) {
@@ -505,9 +488,7 @@ void FunctionAnalyser::analyseContinueStmt(Stmt* stmt) {
         Diag(C->getLocation(), diag::err_continue_not_in_loop);
         return;
     }
-    if (deferDepth && !scope.isDeferScope()) {
-        pushDeferEntry((DeferWalk) { DeferWalkEntry::CONTINUE, .as.continueStmt = C });
-    }
+    C->deferList = scope.exitScopeDefers(Scope::ContinueScope);
 }
 
 void FunctionAnalyser::analyseLabelStmt(Stmt* S) {
@@ -521,9 +502,7 @@ void FunctionAnalyser::analyseLabelStmt(Stmt* S) {
         LD->setStmt(L);
         LD->setLocation(L->getLocation());
     }
-    if (!scope.isDeferScope()) {
-        pushDeferEntry((DeferWalk) { DeferWalkEntry::LABEL, .as.labelDecl = LD });
-    }
+    L->deferTop = scope.deferTop();
 
     unsigned deferIdExpected = scope.isDeferScope() ? deferId : 0;
 
@@ -561,12 +540,12 @@ void FunctionAnalyser::analyseGotoStmt(Stmt* S) {
         // This will always be true since we set the defer just before analysing the defer statement;
         G->setInDefer(deferId);
     }
-    else {
-        // Add the goto if we have registered any defer.
-        pushDeferEntry((DeferWalk){ DeferWalkEntry::GOTO, .as.gotoStmt = G });
-    }
+    G->deferList.start = scope.deferTop();
     IdentifierExpr* label = G->getLabel();
     LabelDecl* LD = LookupOrCreateLabel(label->getName(), label->getLocation());
+    G->labelDecl = LD;
+    // Mark this as a jump back if the label was already defined.
+    if (LD->getStmt()) G->setGotoBack();
     label->setDecl(LD, IdentifierExpr::REF_LABEL);
     // We do a check here if deferIds match
     if (LD->getStmt() || LD->isUsed()) {
@@ -590,7 +569,7 @@ void FunctionAnalyser::analyseCaseStmt(Stmt* stmt) {
         analyseStmt(stmts[i]);
     }
     C->setHasDecls(scope.hasDecls());
-    scope.ExitScope();
+    scope.ExitScope(Context, &stmt);
 }
 
 void FunctionAnalyser::analyseDefaultStmt(Stmt* stmt) {
@@ -602,7 +581,7 @@ void FunctionAnalyser::analyseDefaultStmt(Stmt* stmt) {
         analyseStmt(stmts[i]);
     }
     D->setHasDecls(scope.hasDecls());
-    scope.ExitScope();
+    scope.ExitScope(Context, &stmt);
 }
 
 void FunctionAnalyser::analyseReturnStmt(Stmt* stmt) {
@@ -631,10 +610,7 @@ void FunctionAnalyser::analyseReturnStmt(Stmt* stmt) {
         }
 
     }
-    // No need to store if not in defer.
-    if (deferDepth) {
-        pushDeferEntry((DeferWalk) { DeferWalkEntry::RETURN, .as.returnStmt = ret});
-    }
+    ret->deferTop = scope.deferTop();
 }
 
 void FunctionAnalyser::analyseDeclStmt(Stmt* stmt) {
@@ -1059,10 +1035,8 @@ void FunctionAnalyser::analyseInitListStruct(InitListExpr* expr, QualType Q, uns
     LOG_FUNC
     bool haveDesignators = false;
     expr->setType(Q);
-    // TODO use helper function
     StructType* TT = cast<StructType>(Q.getCanonicalType().getTypePtr());
     StructTypeDecl* STD = TT->getDecl();
-    assert(STD->isStruct() && "TEMP only support structs for now");
     bool constant = true;
     // ether init whole struct with field designators, or don't use any (no mixing allowed)
     // NOTE: using different type for anonymous sub-union is allowed
@@ -2484,226 +2458,78 @@ QualType FunctionAnalyser::UsualUnaryConversions(Expr* expr) const {
 }
 
 
-void FunctionAnalyser::analyseDeferWalk() {
-    size_t numEntries = deferWalk.size();
-    for (unsigned i = 0; i < numEntries; i++) {
-        DeferWalk &walk = deferWalk[i];
-        switch (walk.type) {
-            case DeferWalkEntry::CONTINUE:
-                defersFound.clear();
-                analyseDeferContinue(i);
-                break;
-            case DeferWalkEntry::BREAK:
-                defersFound.clear();
-                analyseDeferBreak(i);
-                break;
-            case DeferWalkEntry::RETURN:
-                defersFound.clear();
-                analyseDeferReturn(i);
-                break;
-            case DeferWalkEntry::GOTO:
-                defersFound.clear();
-                analyseDeferGoto(i);
-                break;
-            case DeferWalkEntry::LABEL:
-            case DeferWalkEntry::BREAK_CONTINUE_START:
-            case DeferWalkEntry::BREAK_START:
-            case DeferWalkEntry::BREAK_CONTINUE_END:
-            case DeferWalkEntry::BREAK_END:
-            case DeferWalkEntry::DEFER:
-            case DeferWalkEntry::EXIT_DEFER:
-                break;
-        }
+static inline unsigned deferDepth(DeferStmt *stmt) {
+    unsigned depth = 0;
+    while (stmt) {
+        stmt = stmt->PrevDefer;
+        depth++;
     }
+    return depth;
 }
 
-DeferStmt** FunctionAnalyser::deferVectorToArray() {
-    if (defersFound.size() == 0) return nullptr;
-    DeferStmt** defers = (DeferStmt**)Context.Allocate(sizeof(DeferStmt*) * (defersFound.size() + 1));
-    memcpy(defers, &(defersFound[0]), sizeof(DeferStmt*) * defersFound.size());
-    defers[defersFound.size()] = nullptr;
-    return defers;
-}
+void FunctionAnalyser::analyseDeferGoto() {
+    LOG_FUNC
+    for (GotoStmt* gotoStmt : gotos) {
 
-void FunctionAnalyser::analyseDeferGotoForward(unsigned gotoIndex, unsigned labelIndex) {
-    // consider:
-    // {
-    //   defer a();
-    //   {
-    //      defer b();
-    //      goto label1;
-    //      defer c();
-    //   }
-    //   defer d();
-    //   {
-    //      defer e();
-    //      label1:
-    //      defer f();
-    //   }
-    // In this case release b(), add conditional to d(), e(). Ignore c();
-    // Step one: find the top common scope:
-    // Start with the label depth, that means we ignore the label when stepping.
-    DeferWalk &walk = deferWalk[labelIndex];
-    unsigned minDepth = walk.depth;
-    for (unsigned i = gotoIndex; i < labelIndex; i++) {
-        if (minDepth > deferWalk[i].depth) {
-            minDepth = deferWalk[i].depth;
+        DeferStmt* labelDeferTop = gotoStmt->labelDecl->getStmt()->deferTop;
+        DeferStmt* gotoDeferTop = gotoStmt->deferList.start;
+
+        // First we need to search for the common depth.
+        unsigned labelDepth = deferDepth(labelDeferTop);
+        unsigned gotoDepth = deferDepth(gotoDeferTop);
+
+        DeferStmt *commonDepthLabel = labelDeferTop;
+        DeferStmt *commonDepthGoto = gotoDeferTop;
+        if (labelDepth > gotoDepth)
+        {
+            for (unsigned i = 0; i < labelDepth - gotoDepth; i++) {
+                commonDepthLabel = commonDepthLabel->PrevDefer;
+            }
+        } else {
+            for (unsigned i = 0; i < gotoDepth - labelDepth; i++) {
+                commonDepthGoto = commonDepthGoto->PrevDefer;
+            }
+        }
+
+        // We will jump up to this level, so we're fine.
+        gotoStmt->deferList.end = commonDepthGoto;
+
+        // The simple case is jumping back, this is just
+        // like doing a break.
+        // label1:
+        // defer do_a();
+        // {
+        //    defer do_b();
+        // }
+        // {
+        //    defer do_c();
+        //    goto label1; // defer list = do_c() -> do_a() -> null
+        // }
+        if (gotoStmt->isGotoBack()) {
+            continue;
+        }
+
+        // In the second case we might pass over some defers.
+        // goto label1: // defer list = null
+        // defer do_a();
+        // {
+        //    defer do_b();
+        // }
+        // {
+        //    defer do_c();
+        //    label1: // defer list = do_c() -> do_a() -> null
+        //    print_something()
+        // }
+
+        // We do a sweep and mark defers as conditional.
+        while (labelDeferTop != commonDepthGoto) {
+            if (!labelDeferTop->shouldEmitBoolean()) {
+                labelDeferTop->setEmitBoolean(true);
+                conditionalDefers.push_back(labelDeferTop->deferId());
+            }
+            labelDeferTop = labelDeferTop->PrevDefer;
         }
     }
-    // Now release defers stepping up until we have reached the top
-    unsigned foundMin = deferWalk[gotoIndex].depth;
-    for (unsigned i = gotoIndex; i > 0; --i) {
-        DeferWalk &search = deferWalk[i - 1];
-        if (search.depth < minDepth) break;
-        if (search.depth >= foundMin) continue;
-        foundMin = search.depth;
-        if (search.type == DeferWalkEntry::DEFER) {
-            defersFound.push_back(search.as.deferStmt);
-        }
-    }
-    // Now walk up and mark everything as should emit boolean.
-
-    foundMin = walk.depth;
-    for (unsigned i = labelIndex - 1; i > gotoIndex; --i) {
-        DeferWalk &search = deferWalk[i];
-        if (search.depth > foundMin) continue;
-        foundMin = search.depth;
-        if (search.type == DeferWalkEntry::DEFER) {
-            printf("Found defer %d\n", i);
-            search.as.deferStmt->setEmitBoolean(true);
-            conditionalDefers.push_back(search.as.deferStmt->deferId());
-        }
-    }
-    deferWalk[gotoIndex].as.gotoStmt->deferStmts = deferVectorToArray();
-}
-
-void FunctionAnalyser::analyseDeferGotoBack(unsigned gotoIndex, unsigned labelIndex) {
-    // Label index = 0 means we assume it occurs before everything else.
-    // found points at the first entry after the label we found.
-    // Let's go from the goto and up, release any defer we find.
-    addAllPreviousDefers(gotoIndex, labelIndex);
-    deferWalk[gotoIndex].as.gotoStmt->deferStmts = deferVectorToArray();
-}
-
-void FunctionAnalyser::analyseDeferGoto(unsigned int gotoIndex) {
-
-    GotoStmt *gotoStmt = deferWalk[gotoIndex].as.gotoStmt;
-
-    // Case 1: label occurs after (we test this first, because if the label is missing we assume
-    // it occurs first.
-    unsigned numEntries = (unsigned)deferWalk.size();
-    for (unsigned i = gotoIndex + 1; i < numEntries; i++) {
-        DeferWalk &walk = deferWalk[i];
-        if (gotoStmt->getLabel()->getDecl() == walk.as.labelDecl) {
-            analyseDeferGotoForward(gotoIndex, i);
-            return;
-        }
-    }
-    // Check if label occurs before.
-    for (unsigned i = 0; i < gotoIndex; i++) {
-        DeferWalk &walk = deferWalk[i];
-        if (walk.as.labelDecl == gotoStmt->getLabel()->getDecl()) {
-            return analyseDeferGotoBack(gotoIndex, i);
-        }
-    }
-    // If we don't find a label, then we assume it appears before any defer.
-    analyseDeferGotoBack(gotoIndex, 0);
-}
-
-
-// Find all the defers up to break scope end.
-void FunctionAnalyser::analyseDeferBreak(unsigned breakIndex) {
-
-    unsigned minDepth = deferWalk[breakIndex].depth;
-
-    // We need to make sure that we don't accidentally end our search when we a nested while/for/do/switch
-    int scopeCounter = 0;
-
-    for (unsigned i = breakIndex; i > 0; --i) {
-
-        // Note the use of i - 1!
-        DeferWalk &walk = deferWalk[i - 1];
-        switch (walk.type) {
-            case DeferWalkEntry::BREAK_CONTINUE_END:
-            case DeferWalkEntry::BREAK_END:
-                ++scopeCounter;
-                continue;
-            case DeferWalkEntry::BREAK_CONTINUE_START:
-            case DeferWalkEntry::BREAK_START:
-                if (--scopeCounter) break;
-                continue;
-            case DeferWalkEntry::DEFER:
-                // Walk upwards, any defer of decreasing depth will be released.
-                if (walk.depth < minDepth) {
-                    minDepth = walk.depth;
-                    defersFound.push_back(walk.as.deferStmt);
-                }
-                continue;
-            default:
-                continue;
-        }
-        break;
-    }
-    deferWalk[breakIndex].as.breakStmt->deferStmts = deferVectorToArray();
-}
-
-// Find all the defers up to continue scope end.
-void FunctionAnalyser::analyseDeferContinue(unsigned continueIndex) {
-
-    unsigned minDepth = deferWalk[continueIndex].depth;
-
-    // We need to make sure that we don't accidentally end our search when we a nested while/for/do/switch
-    int scopeCounter = 0;
-
-    for (unsigned i = continueIndex; i > 0; --i) {
-
-        // Note the use of i - 1!
-        DeferWalk &walk = deferWalk[i - 1];
-        switch (walk.type) {
-            case DeferWalkEntry::BREAK_CONTINUE_END:
-                ++scopeCounter;
-                continue;
-            case DeferWalkEntry::BREAK_CONTINUE_START:
-                if (--scopeCounter) break;
-                continue;
-            case DeferWalkEntry::DEFER:
-                // Walk upwards, any defer of decreasing depth will be released.
-                if (walk.depth < minDepth) {
-                    minDepth = walk.depth;
-                    defersFound.push_back(walk.as.deferStmt);
-                }
-                continue;
-            default:
-                continue;
-        }
-        break;
-    }
-    deferWalk[continueIndex].as.continueStmt->deferStmts = deferVectorToArray();
-}
-
-// Walk back up to top and add defers.
-void FunctionAnalyser::addAllPreviousDefers(unsigned startIndex, unsigned endIndex) {
-
-    unsigned minDepth = deferWalk[startIndex].depth;
-
-    // Walk upwards, any defer of decreasing depth will be released.
-    for (unsigned i = startIndex; i > endIndex; --i) {
-
-        // Note the use of i - 1!
-        DeferWalk &walk = deferWalk[i - 1];
-
-        // We're only interested in defers,
-        // and only if they occur at higher up.
-        if (walk.type != DeferWalkEntry::DEFER || walk.depth >= minDepth) continue;
-
-        minDepth = walk.depth;
-        defersFound.push_back(walk.as.deferStmt);
-    }
-}
-
-void FunctionAnalyser::analyseDeferReturn(unsigned returnIndex) {
-    addAllPreviousDefers(returnIndex, 0);
-    deferWalk[returnIndex].as.returnStmt->deferStmts = deferVectorToArray();
 }
 
 

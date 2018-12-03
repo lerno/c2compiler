@@ -7,24 +7,24 @@ module test;
 import stdio local;
 
 public func i32 main(i32 argc, const i8*[] argv) {
-    defer printf("1");
+  defer printf("1");
 	i32 a = 0;
-    while (a) {
-	    defer printf("2");
-        if (argc == 1) return a + argc;
-        defer printf("3");
+  while (a) {
+	  defer printf("2");
+    if (argc == 1) return a + argc;
+    defer printf("3");
 		printf("4");
-    }
-    defer printf("5");
-    while (a) {
-	    defer printf("6");
-        if (argc == 1) return a + 2;
-        defer printf("7");
+  }
+  defer printf("5");
+  while (a) {
+	  defer printf("6");
+    if (argc == 1) return a + 2;
+    defer printf("7");
 		printf("8");
 		return 2 + 2;
-        defer printf("9");
-    }
-    return 0 + argc;
+    defer printf("9");
+  }
+  return 0 + argc;
 }
 
 // @expect{atleast, build/test.c}
@@ -32,76 +32,44 @@ public func i32 main(i32 argc, const i8*[] argv) {
 #include "stdio.h"
 
 int32_t main(int32_t argc, const char* argv[]) {
-    int32_t a = 0;
-    while (a) {
-        if ((argc == 1)) {
-          {
-            int32_t __defer_return = (a + argc);
-            do {
-              printf("2");
-            } while(0);
-            do {
-              printf("1");
-            } while(0);
-            return __defer_return;
-          }
-        }
-          printf("4");
-        do {
-          printf("3");
-        } while(0);
-      do {
-        printf("2");
-      } while(0);
-    }
-      while (a) {
-          if ((argc == 1)) {
-            {
-              int32_t __defer_return = (a + 2);
-              do {
-                printf("6");
-              } while(0);
-              do {
-                printf("5");
-              } while(0);
-              do {
-                printf("1");
-              } while(0);
-              return __defer_return;
-            }
-          }
-            printf("8");
-            do {
-              printf("7");
-            } while(0);
-            do {
-              printf("6");
-            } while(0);
-            do {
-              printf("5");
-            } while(0);
-            do {
-              printf("1");
-            } while(0);
-            return (2 + 2);
-            do {
-              printf("9");
-            } while(0);
-          do {
-            printf("7");
-          } while(0);
-        do {
-          printf("6");
-        } while(0);
-      }
+  int32_t a = 0;
+  while (a) {
+    if (argc == 1) {
       {
-        int32_t __defer_return = (0 + argc);
-        do {
-          printf("5");
-        } while(0);
-        do {
-          printf("1");
-        } while(0);
-        return __defer_return;
+        int32_t __defer_ret = a + argc;
+        printf("2");
+        printf("1");
+        return __defer_ret;
       }
+    }
+    printf("4");
+    printf("3");
+    printf("2");
+  }
+  while (a) {
+    if (argc == 1) {
+      {
+        int32_t __defer_ret = a + 2;
+        printf("6");
+        printf("5");
+        printf("1");
+        return __defer_ret;
+      }
+    }
+    printf("8");
+    printf("7");
+    printf("6");
+    printf("5");
+    printf("1");
+    return 2 + 2;
+    printf("9");
+    printf("7");
+    printf("6");
+  }
+  {
+    int32_t __defer_ret = 0 + argc;
+    printf("5");
+    printf("1");
+    return __defer_ret;
+  }
 }

@@ -129,7 +129,6 @@ private:
     QualType analyseEnumMinMaxExpr(BuiltinExpr* B, bool isMin);
     void analyseArrayType(VarDecl* V, QualType T);
     void analyseArraySizeExpr(ArrayType* AT);
-    DeferStmt** deferVectorToArray();
 
     c2lang::DiagnosticBuilder Diag(c2lang::SourceLocation Loc, unsigned DiagID) const;
     void pushMode(unsigned DiagID);
@@ -194,75 +193,17 @@ private:
 
 
     std::vector<unsigned> conditionalDefers {};
-
-    CallStack callStack;
-
-    enum class DeferWalkEntry {
-        DEFER,
-        GOTO,
-        LABEL,
-        BREAK,
-        CONTINUE,
-        RETURN,
-        BREAK_START,
-        BREAK_CONTINUE_START,
-        BREAK_END,
-        BREAK_CONTINUE_END,
-        EXIT_DEFER,
-    };
-    struct DeferWalk {
-        DeferWalkEntry type;
-        unsigned depth;
-        union {
-            ReturnStmt* returnStmt;
-            ContinueStmt* continueStmt;
-            BreakStmt* breakStmt;
-            DeferStmt* deferStmt;
-            GotoStmt* gotoStmt;
-            LabelDecl* labelDecl;
-            Stmt* entryPoointStmt;
-        } as;
-    };
-
-    std::vector<DeferWalk> deferWalk {};
-    unsigned deferDepth = 0;
-
-    void addAllPreviousDefers(unsigned startIndex, unsigned endIndex);
-
-    void pushDeferEntry(DeferWalk &&walk) {
-        walk.depth = deferDepth;
-        switch(walk.type) {
-            case DeferWalkEntry::DEFER:
-                ++deferDepth;
-                break;
-            case DeferWalkEntry::EXIT_DEFER:
-                --deferDepth;
-                break;
-            case DeferWalkEntry::CONTINUE:
-            case DeferWalkEntry::BREAK:
-            case DeferWalkEntry::LABEL:
-            case DeferWalkEntry::GOTO:
-            case DeferWalkEntry::BREAK_CONTINUE_START:
-            case DeferWalkEntry::BREAK_START:
-            case DeferWalkEntry::BREAK_CONTINUE_END:
-            case DeferWalkEntry::BREAK_END:
-            case DeferWalkEntry::RETURN:
-                break;
-        }
-        deferWalk.push_back(std::move(walk));
-    }
-
+    CallStack callStack {};
 
     typedef std::vector<LabelDecl*> Labels;
     typedef Labels::iterator LabelsIter;
     Labels labels {};
     typedef std::vector<GotoStmt*> Gotos;
     Gotos gotos {};
-    std::vector<DeferStmt *> defersFound {};
 
     FunctionAnalyser(const FunctionAnalyser&);
     FunctionAnalyser& operator= (const FunctionAnalyser&);
-    void analyseDeferWalk();
+    void analyseDeferGoto();
     void analyseDeferGotoForward(unsigned gotoIndex, unsigned labelIndex);
     void analyseDeferGotoBack(unsigned gotoIndex, unsigned labelIndex);
     void analyseDeferGoto(unsigned i);

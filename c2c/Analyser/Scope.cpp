@@ -22,6 +22,8 @@
 #include "Analyser/Scope.h"
 #include "Analyser/AnalyserUtils.h"
 #include "AST/Decl.h"
+#include "Scope.h"
+#include "AST/Stmt.h"
 
 using namespace C2;
 using namespace c2lang;
@@ -33,6 +35,7 @@ DynamicScope::DynamicScope(c2lang::DiagnosticsEngine& Diags_)
 
 void DynamicScope::reset(unsigned flags) {
     Flags = flags;
+    FlagsCreated = flags;
     ErrorTrap.reset();
 }
 
@@ -314,7 +317,23 @@ void Scope::EnterScope(unsigned flags) {
     scopeIndex++;
 }
 
-void Scope::ExitScope() {
+static inline bool shouldSkipExitDeferStmt(Stmt* stmt)
+{
+    if (!stmt) return false;
+    switch (stmt->getKind()) {
+        case StmtKind::STMT_RETURN:
+        case StmtKind::STMT_BREAK:
+        case StmtKind::STMT_CONTINUE:
+        case StmtKind::STMT_GOTO:
+            return true;
+        case StmtKind::STMT_COMPOUND:
+            return shouldSkipExitDeferStmt(cast<CompoundStmt>(stmt)->getLastStmt());
+        default:
+            return false;
+    }
+}
+
+void Scope::ExitScope(ASTContext &context, Stmt** stmtRef) {
     for (unsigned i=0; i<curScope->decls.size(); i++) {
         VarDecl* D = curScope->decls[i];
         if (!D->isUsed() && !curScope->hasErrorOccurred()) {
@@ -327,12 +346,39 @@ void Scope::ExitScope() {
         assert(iter != symbolCache.end());
         symbolCache.erase(iter);
     }
+    DeferStmt *deferStmt = deferTop();
+    curScope->lastDefer = nullptr;
     curScope->decls.clear();
     curScope->Flags = 0;
 
     scopeIndex--;
     if (scopeIndex == 0) curScope = 0;
     else curScope = scopes[scopeIndex-1];
+
+    DeferStmt *deferStmtEnd = deferTop();
+    
+    if (deferStmt == deferStmtEnd) return;
+    DeferList list = { deferStmt, deferStmtEnd };
+    if (CompoundStmt::classof(*stmtRef)) {
+        CompoundStmt *compoundStmt = cast<CompoundStmt>(*stmtRef);
+        // Ignore defer if the last statement was an exit.
+        if (shouldSkipExitDeferStmt(compoundStmt->getLastStmt())) return;
+        compoundStmt->deferList = list;
+        return;
+    }
+    if (CaseStmt::classof(*stmtRef)) {
+        CaseStmt *caseStmt = cast<CaseStmt>(*stmtRef);
+        if (shouldSkipExitDeferStmt(caseStmt->getLastStmt())) return;
+        caseStmt->deferList = { deferStmt, deferStmtEnd };
+        return;
+    }
+    if (DefaultStmt::classof(*stmtRef)) {
+        DefaultStmt *defaultStmt = cast<DefaultStmt>(*stmtRef);
+        if (shouldSkipExitDeferStmt(defaultStmt->getLastStmt())) return;
+        defaultStmt->deferList = { deferStmt, deferStmtEnd };
+        return;
+    }
+    *stmtRef = new (context) DeferReleasedStmt(*stmtRef, (DeferList) { deferStmt, deferStmtEnd } );
 }
 
 const Module* Scope::findAnyModule(const char* name_) const {
@@ -340,5 +386,62 @@ const Module* Scope::findAnyModule(const char* name_) const {
     if (iter == allModules.end()) return 0;
     return iter->second;
 }
+
+DeferStmt* Scope::deferTop() {
+    for (unsigned scope = scopeIndex; scope > 0; scope--) {
+        if (scopes[scope - 1]->lastDefer) {
+            return scopes[scope - 1]->lastDefer;
+        }
+    }
+    return nullptr;
+}
+void Scope::pushDefer(DeferStmt* defer) {
+    defer->PrevDefer = deferTop();
+    curScope->lastDefer = defer;
+}
+
+
+void Scope::setHasBreaks() {
+
+    // Set "has breaks" for the break starting scope (may be several levels up)
+    unsigned index = scopeIndex;
+    while (index > 0) {
+        DynamicScope *scope = scopes[--index];
+        if ((scope->FlagsCreated & BreakScope) != 0) {
+            scope->Flags |= HasBreaks;
+            return;
+        }
+    }
+    FATAL_ERROR("Set breaks but break scope found");
+}
+
+DeferStmt* Scope::deferForScopeIndex(unsigned index) {
+    while (index > 0) {
+        DynamicScope *scope = scopes[--index];
+        if (scope->lastDefer) return scope->lastDefer;
+    }
+    return nullptr;
+}
+
+DeferList Scope::exitScopeDefers(unsigned flags) {
+    if (isDeferScope()) return DeferList { };
+    // Starting at the current scope
+    unsigned index = scopeIndex;
+    while (index > 0) {
+        DynamicScope *scope = scopes[--index];
+        
+        // Check if this scope created the flag(s)
+        if ((scope->FlagsCreated & flags) == flags) {
+            // It did!
+            return DeferList {
+                deferTop(),
+                deferForScopeIndex(index)
+            };
+        }
+    }
+    FATAL_ERROR("Could not find expected exit scope");
+}
+
+
 
 

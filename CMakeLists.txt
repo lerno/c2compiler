@@ -9,8 +9,8 @@ else(CYGWIN OR WIN32)
 	set(CMAKE_CXX_COMPILER "clang++")
 endif(CYGWIN OR WIN32)
 
-set(CMAKE_BUILD_TYPE Release)
-#set(CMAKE_BUILD_TYPE Debug)
+#set(CMAKE_BUILD_TYPE Release)
+set(CMAKE_BUILD_TYPE Debug)
 
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wshadow -Wno-overloaded-virtual -Wno-unused-parameter")
 

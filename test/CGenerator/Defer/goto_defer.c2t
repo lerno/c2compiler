@@ -32,42 +32,30 @@ public func i32 main(i32 argc, const i8*[] argv) {
 #include "stdio.h"
 
 int32_t main(int32_t argc, const char* argv[]) {
-    printf("---");
+  printf("---");
 label1:
-    {
-        printf("1");
-        if ((argc == 0)) {
-            do {
-                printf("deferA");
-            } while(0);
-            goto label1;
-        }
-        if ((argc == 1)) {
-            do {
-                printf("deferA");
-            } while(0);
-            return -1;
-        }
-        {
-            if ((argc == 2)) {
-                do {
-                    printf("inner");
-                } while(0);
-                goto label2;
-            }
-            do {
-                printf("inner");
-            } while(0);
-        }
-label2:
-        printf("2");
-        do {
-            printf("deferB");
-        } while(0);
-        do {
-            printf("deferA");
-        } while(0);
+  {
+    printf("1");
+    if (argc == 0) {
+      printf("deferA");
+      goto label1;
     }
-    printf("3");
-    return (0 + argc);
+    if (argc == 1) {
+      printf("deferA");
+      return -1;
+    }
+    {
+      if (argc == 2) {
+        printf("inner");
+        goto label2;
+      }
+      printf("inner");
+    }
+label2:
+    printf("2");
+    printf("deferB");
+    printf("deferA");
+  }
+  printf("3");
+  return 0 + argc;
 }

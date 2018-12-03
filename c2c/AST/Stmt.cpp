@@ -36,79 +36,83 @@ void* Stmt::operator new(size_t bytes, const C2::ASTContext& C, unsigned alignme
 
 void Stmt::print(StringBuilder& buffer, unsigned indent) const {
     switch (getKind()) {
-    case STMT_RETURN:
-        return cast<ReturnStmt>(this)->print(buffer, indent);
-    case STMT_EXPR:
-        return cast<Expr>(this)->print(buffer, indent);
-    case STMT_IF:
-        return cast<IfStmt>(this)->print(buffer, indent);
-    case STMT_WHILE:
-        return cast<WhileStmt>(this)->print(buffer, indent);
-    case STMT_DO:
-        return cast<DoStmt>(this)->print(buffer, indent);
-    case STMT_FOR:
-        return cast<ForStmt>(this)->print(buffer, indent);
-    case STMT_SWITCH:
-        return cast<SwitchStmt>(this)->print(buffer, indent);
-    case STMT_CASE:
-        return cast<CaseStmt>(this)->print(buffer, indent);
-    case STMT_DEFAULT:
-        return cast<DefaultStmt>(this)->print(buffer, indent);
-    case STMT_BREAK:
-        return cast<BreakStmt>(this)->print(buffer, indent);
-    case STMT_CONTINUE:
-        return cast<ContinueStmt>(this)->print(buffer, indent);
-    case STMT_LABEL:
-        return cast<LabelStmt>(this)->print(buffer, indent);
-    case STMT_GOTO:
-        return cast<GotoStmt>(this)->print(buffer, indent);
-    case STMT_COMPOUND:
-        return cast<CompoundStmt>(this)->print(buffer, indent);
-    case STMT_DECL:
-        return cast<DeclStmt>(this)->print(buffer, indent);
-    case STMT_ASM:
-        return cast<AsmStmt>(this)->print(buffer, indent);
-    case STMT_DEFER:
-        return cast<DeferStmt>(this)->print(buffer, indent);
+        case STMT_RETURN:
+            return cast<ReturnStmt>(this)->print(buffer, indent);
+        case STMT_EXPR:
+            return cast<Expr>(this)->print(buffer, indent);
+        case STMT_IF:
+            return cast<IfStmt>(this)->print(buffer, indent);
+        case STMT_WHILE:
+            return cast<WhileStmt>(this)->print(buffer, indent);
+        case STMT_DO:
+            return cast<DoStmt>(this)->print(buffer, indent);
+        case STMT_FOR:
+            return cast<ForStmt>(this)->print(buffer, indent);
+        case STMT_SWITCH:
+            return cast<SwitchStmt>(this)->print(buffer, indent);
+        case STMT_CASE:
+            return cast<CaseStmt>(this)->print(buffer, indent);
+        case STMT_DEFAULT:
+            return cast<DefaultStmt>(this)->print(buffer, indent);
+        case STMT_BREAK:
+            return cast<BreakStmt>(this)->print(buffer, indent);
+        case STMT_CONTINUE:
+            return cast<ContinueStmt>(this)->print(buffer, indent);
+        case STMT_LABEL:
+            return cast<LabelStmt>(this)->print(buffer, indent);
+        case STMT_GOTO:
+            return cast<GotoStmt>(this)->print(buffer, indent);
+        case STMT_COMPOUND:
+            return cast<CompoundStmt>(this)->print(buffer, indent);
+        case STMT_DECL:
+            return cast<DeclStmt>(this)->print(buffer, indent);
+        case STMT_ASM:
+            return cast<AsmStmt>(this)->print(buffer, indent);
+        case STMT_DEFER:
+            return cast<DeferStmt>(this)->print(buffer, indent);
+        case STMT_DEFER_RELEASED:
+            return cast<DeferReleasedStmt>(this)->print(buffer, indent);
     }
 }
 
 SourceLocation Stmt::getLocation() const {
     switch (getKind()) {
-    case STMT_RETURN:
-        return cast<ReturnStmt>(this)->getLocation();
-    case STMT_EXPR:
-        return cast<Expr>(this)->getLocation();
-    case STMT_IF:
-        return cast<IfStmt>(this)->getLocation();
-    case STMT_WHILE:
-        return cast<WhileStmt>(this)->getLocation();
-    case STMT_DO:
-        return cast<DoStmt>(this)->getLocation();
-    case STMT_FOR:
-        return cast<ForStmt>(this)->getLocation();
-    case STMT_SWITCH:
-        return cast<SwitchStmt>(this)->getLocation();
-    case STMT_CASE:
-        return cast<CaseStmt>(this)->getLocation();
-    case STMT_DEFAULT:
-        return cast<DefaultStmt>(this)->getLocation();
-    case STMT_BREAK:
-        return cast<BreakStmt>(this)->getLocation();
-    case STMT_CONTINUE:
-        return cast<ContinueStmt>(this)->getLocation();
-    case STMT_LABEL:
-        return cast<LabelStmt>(this)->getLocation();
-    case STMT_GOTO:
-        return cast<GotoStmt>(this)->getLocation();
-    case STMT_COMPOUND:
-        return cast<CompoundStmt>(this)->getLocation();
-    case STMT_DECL:
-        return cast<DeclStmt>(this)->getLocation();
-    case STMT_ASM:
-        return cast<AsmStmt>(this)->getLocation();
-    case STMT_DEFER:
-        return cast<DeferStmt>(this)->getLocation();
+        case STMT_RETURN:
+            return cast<ReturnStmt>(this)->getLocation();
+        case STMT_EXPR:
+            return cast<Expr>(this)->getLocation();
+        case STMT_IF:
+            return cast<IfStmt>(this)->getLocation();
+        case STMT_WHILE:
+            return cast<WhileStmt>(this)->getLocation();
+        case STMT_DO:
+            return cast<DoStmt>(this)->getLocation();
+        case STMT_FOR:
+            return cast<ForStmt>(this)->getLocation();
+        case STMT_SWITCH:
+            return cast<SwitchStmt>(this)->getLocation();
+        case STMT_CASE:
+            return cast<CaseStmt>(this)->getLocation();
+        case STMT_DEFAULT:
+            return cast<DefaultStmt>(this)->getLocation();
+        case STMT_BREAK:
+            return cast<BreakStmt>(this)->getLocation();
+        case STMT_CONTINUE:
+            return cast<ContinueStmt>(this)->getLocation();
+        case STMT_LABEL:
+            return cast<LabelStmt>(this)->getLocation();
+        case STMT_GOTO:
+            return cast<GotoStmt>(this)->getLocation();
+        case STMT_COMPOUND:
+            return cast<CompoundStmt>(this)->getLocation();
+        case STMT_DECL:
+            return cast<DeclStmt>(this)->getLocation();
+        case STMT_ASM:
+            return cast<AsmStmt>(this)->getLocation();
+        case STMT_DEFER:
+            return cast<DeferStmt>(this)->getLocation();
+        case STMT_DEFER_RELEASED:
+            return cast<DeferReleasedStmt>(this)->getLocation();
     }
 }
 
@@ -123,6 +127,7 @@ ReturnStmt::ReturnStmt(SourceLocation loc, Expr* value_)
     : Stmt(STMT_RETURN)
     , RetLoc(loc)
     , value(value_)
+    , deferTop()
 {}
 
 void ReturnStmt::print(StringBuilder& buffer, unsigned indent) const {
@@ -134,6 +139,20 @@ void ReturnStmt::print(StringBuilder& buffer, unsigned indent) const {
     }
 }
 
+DeferReleasedStmt::DeferReleasedStmt(Stmt *stmt_, DeferList deferList_)
+    : Stmt(STMT_DEFER_RELEASED)
+    , stmt(stmt_)
+    , deferList(deferList_)
+{}
+
+void DeferReleasedStmt::print(StringBuilder& buffer, unsigned indent) const {
+    buffer.indent(indent);
+    buffer.setColor(COL_STMT);
+    buffer << "DeferReleasedStmt\n";
+    if (stmt) {
+        stmt->print(buffer, indent + INDENT);
+    }
+}
 
 IfStmt::IfStmt(SourceLocation ifLoc,
                Stmt* condition, Stmt* thenStmt,
@@ -197,11 +216,10 @@ void DoStmt::print(StringBuilder& buffer, unsigned indent) const {
     Then->print(buffer, indent + INDENT);
 }
 
-DeferStmt::DeferStmt(SourceLocation Loc_, Stmt* Defer_, CompoundStmt* AfterDefer_)
+DeferStmt::DeferStmt(SourceLocation Loc_, Stmt* Defer_)
     : Stmt(STMT_DEFER)
     , Loc(Loc_)
     , Defer(Defer_)
-    , AfterDefer(AfterDefer_)
 {}
 
 void DeferStmt::print(StringBuilder& buffer, unsigned indent) const {
@@ -292,7 +310,6 @@ void DefaultStmt::print(StringBuilder& buffer, unsigned indent) const {
 BreakStmt::BreakStmt(SourceLocation Loc_)
     : Stmt(STMT_BREAK)
     , Loc(Loc_)
-    , deferStmts(nullptr)
 {}
 
 void BreakStmt::print(StringBuilder& buffer, unsigned indent) const {
@@ -305,7 +322,7 @@ void BreakStmt::print(StringBuilder& buffer, unsigned indent) const {
 ContinueStmt::ContinueStmt(SourceLocation Loc_)
     : Stmt(STMT_CONTINUE)
     , Loc(Loc_)
-    , deferStmts(nullptr)
+    , deferList()
 {}
 
 void ContinueStmt::print(StringBuilder& buffer, unsigned indent) const {
@@ -336,7 +353,7 @@ GotoStmt::GotoStmt(IdentifierExpr* label_, SourceLocation GotoLoc_)
     : Stmt(STMT_GOTO)
     , label(label_)
     , GotoLoc(GotoLoc_)
-    , deferStmts(nullptr)
+    , deferList()
 {}
 
 void GotoStmt::print(StringBuilder& buffer, unsigned indent) const {
@@ -349,6 +366,7 @@ void GotoStmt::print(StringBuilder& buffer, unsigned indent) const {
 
 CompoundStmt::CompoundStmt(SourceLocation l, SourceLocation r, Stmt** stmts_, unsigned numStmts_)
     : Stmt(STMT_COMPOUND)
+    , deferList()
     , Left(l)
     , Right(r)
     , stmts(stmts_)

@@ -21,10 +21,13 @@
 #include "CGenerator/TypeSorter.h"
 #include "AST/Module.h"
 #include "Utils/StringBuilder.h"
+#include "AST/DeferList.h"
 
 namespace C2 {
 
 class Decl;
+class ContinueStmt;
+class DeferReleasedStmt;
 class DeferStmt;
 class VarDecl;
 class TypeDecl;
@@ -91,9 +94,9 @@ private:
     void EmitAsmPart(bool multiline, unsigned indent);
     void EmitAsmOperand(const char* name, const StringLiteral* c, const Expr* e);
 
-    void EmitExpr(const Expr* E, StringBuilder& output);
+    void EmitExpr(const Expr* E, StringBuilder& output, bool alreadyHasParens = false);
     void EmitBuiltinExpr(const Expr* E, StringBuilder& output);
-    void EmitBinaryOperator(const Expr* E, StringBuilder& output);
+    void EmitBinaryOperator(const Expr* E, StringBuilder& output, bool alreadyHasParens = false);
     void EmitConditionalOperator(const Expr* E, StringBuilder& output);
     void EmitUnaryOperator(const Expr* E, StringBuilder& output);
     void EmitMemberExpr(const Expr* E, StringBuilder& output);
@@ -111,7 +114,12 @@ private:
     void EmitConditionPost(const Stmt* S);
     bool EmitAttributes(const Decl* D, StringBuilder& output, bool addStartSpace);
 
-    void EmitDefers(DeferStmt** deferList, unsigned indent);
+    void EmitSingleDefer(DeferStmt* defer, unsigned indent);
+    void EmitDefers(DeferStmt* deferStart, DeferStmt* end, unsigned indent);
+    inline void EmitDefers(const DeferList &deferList, unsigned indent) {
+        EmitDefers(deferList.start, deferList.end, indent);
+    }
+
     bool EmitAsStatic(const Decl* D) const;
     bool EmitAsDefine(const VarDecl* V) const;
 
@@ -133,6 +141,8 @@ private:
     CCodeGenerator& operator= (const CCodeGenerator&);
     void EmitDeferStmt(const DeferStmt* defer, unsigned indent);
     void EmitBreakStmt(const BreakStmt* breakStmt, unsigned indent);
+    void EmitContinueStmt(const ContinueStmt* continueStmt, unsigned indent);
+    void EmitDeferReleased(const C2::DeferReleasedStmt* stmt, unsigned int indent);
 };
 
 }

@@ -37,97 +37,102 @@ unsigned RefFinder::find() {
 void RefFinder::searchStmt(const Stmt* S) {
     assert(S);
     switch (S->getKind()) {
-    case STMT_RETURN:
-    {
-        const ReturnStmt* R = cast<ReturnStmt>(S);
-        if (R->getExpr()) searchExpr(R->getExpr());
-        break;
-    }
-    case STMT_EXPR:
-        searchExpr(cast<Expr>(S));
-        break;
-    case STMT_IF:
-    {
-        const IfStmt* I = cast<IfStmt>(S);
-        searchStmt(I->getCond());
-        searchStmt(I->getThen());
-        if (I->getElse()) searchStmt(I->getElse());
-        break;
-    }
-    case STMT_WHILE:
-    {
-        const WhileStmt* W = cast<WhileStmt>(S);
-        searchStmt(W->getCond());
-        searchStmt(W->getBody());
-        break;
-    }
-    case STMT_DO:
-    {
-        const DoStmt* D = cast<DoStmt>(S);
-        searchStmt(D->getCond());
-        searchStmt(D->getBody());
-        break;
-    }
-    case STMT_DEFER:
-    {
-        const DeferStmt* D = cast<DeferStmt>(S);
-        searchStmt(D->getDefer());
-        searchStmt(D->getAfterDefer());
-        break;
-    }
-    case STMT_FOR:
-    {
-        const ForStmt* F = cast<ForStmt>(S);
-        if (F->getInit()) searchStmt(F->getInit());
-        if (F->getCond()) searchExpr(F->getCond());
-        if (F->getIncr()) searchExpr(F->getIncr());
-        searchStmt(F->getBody());
-        break;
-    }
-    case STMT_SWITCH:
-    {
-        const SwitchStmt* SW = cast<SwitchStmt>(S);
-        searchStmt(SW->getCond());
-        Stmt** Cases = SW->getCases();
-        for (unsigned i=0; i<SW->numCases(); i++) {
-            searchStmt(Cases[i]);
+        case STMT_RETURN:
+        {
+            const ReturnStmt* R = cast<ReturnStmt>(S);
+            if (R->getExpr()) searchExpr(R->getExpr());
+            break;
         }
-        break;
-    }
-    case STMT_CASE:
-    {
-        const CaseStmt* C = cast<CaseStmt>(S);
-        searchExpr(C->getCond());
-        Stmt** stmts = C->getStmts();
-        for (unsigned i=0; i<C->numStmts(); i++) {
-            searchStmt(stmts[i]);
+        case STMT_EXPR:
+            searchExpr(cast<Expr>(S));
+            break;
+        case STMT_IF:
+        {
+            const IfStmt* I = cast<IfStmt>(S);
+            searchStmt(I->getCond());
+            searchStmt(I->getThen());
+            if (I->getElse()) searchStmt(I->getElse());
+            break;
         }
-        break;
-    }
-    case STMT_DEFAULT:
-    {
-        const DefaultStmt* D = cast<DefaultStmt>(S);
-        Stmt** stmts = D->getStmts();
-        for (unsigned i=0; i<D->numStmts(); i++) {
-            searchStmt(stmts[i]);
+        case STMT_WHILE:
+        {
+            const WhileStmt* W = cast<WhileStmt>(S);
+            searchStmt(W->getCond());
+            searchStmt(W->getBody());
+            break;
         }
-        break;
-    }
-    case STMT_BREAK:
-    case STMT_CONTINUE:
-    case STMT_LABEL:
-    case STMT_GOTO:
-        break;
-    case STMT_COMPOUND:
-        searchCompoundStmt(cast<CompoundStmt>(S));
-        break;
-    case STMT_DECL:
-        // TODO
-        //searchVarDecl(cast<DeclStmt>(S)->getDecl());
-        break;
-    case STMT_ASM:
-        searchAsmStmt(cast<AsmStmt>(S));
-        break;
+        case STMT_DO:
+        {
+            const DoStmt* D = cast<DoStmt>(S);
+            searchStmt(D->getCond());
+            searchStmt(D->getBody());
+            break;
+        }
+        case STMT_DEFER:
+        {
+            const DeferStmt* D = cast<DeferStmt>(S);
+            searchStmt(D->getDefer());
+            break;
+        }
+        case STMT_DEFER_RELEASED:
+        {
+            const DeferReleasedStmt* D = cast<DeferReleasedStmt>(S);
+            searchStmt(D->getStmt());
+            break;
+        }
+        case STMT_FOR:
+        {
+            const ForStmt* F = cast<ForStmt>(S);
+            if (F->getInit()) searchStmt(F->getInit());
+            if (F->getCond()) searchExpr(F->getCond());
+            if (F->getIncr()) searchExpr(F->getIncr());
+            searchStmt(F->getBody());
+            break;
+        }
+        case STMT_SWITCH:
+        {
+            const SwitchStmt* SW = cast<SwitchStmt>(S);
+            searchStmt(SW->getCond());
+            Stmt** Cases = SW->getCases();
+            for (unsigned i=0; i<SW->numCases(); i++) {
+                searchStmt(Cases[i]);
+            }
+            break;
+        }
+        case STMT_CASE:
+        {
+            const CaseStmt* C = cast<CaseStmt>(S);
+            searchExpr(C->getCond());
+            Stmt** stmts = C->getStmts();
+            for (unsigned i=0; i<C->numStmts(); i++) {
+                searchStmt(stmts[i]);
+            }
+            break;
+        }
+        case STMT_DEFAULT:
+        {
+            const DefaultStmt* D = cast<DefaultStmt>(S);
+            Stmt** stmts = D->getStmts();
+            for (unsigned i=0; i<D->numStmts(); i++) {
+                searchStmt(stmts[i]);
+            }
+            break;
+        }
+        case STMT_BREAK:
+        case STMT_CONTINUE:
+        case STMT_LABEL:
+        case STMT_GOTO:
+            break;
+        case STMT_COMPOUND:
+            searchCompoundStmt(cast<CompoundStmt>(S));
+            break;
+        case STMT_DECL:
+            // TODO
+            //searchVarDecl(cast<DeclStmt>(S)->getDecl());
+            break;
+        case STMT_ASM:
+            searchAsmStmt(cast<AsmStmt>(S));
+            break;
     }
 }
 
